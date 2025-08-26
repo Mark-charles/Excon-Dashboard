@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
 type InjectType = "in person" | "radio/phone" | "electronic" | "other"
-type InjectStatus = "pending" | "completed" | "missed"
+type InjectStatus = "pending" | "completed" | "missed" | "skipped"
 type ResourceStatus = "requested" | "tasked" | "enroute" | "arrived" | "cancelled"
 
 type InjectItem = {
@@ -365,6 +365,7 @@ export default function Dashboard() {
       case "pending": return "bg-gray-500 text-white"
       case "completed": return "bg-green-500 text-white"
       case "missed": return "bg-red-500 text-white"
+      case "skipped": return "bg-orange-500 text-white"
       default: return "bg-gray-500 text-white"
     }
   }
@@ -374,6 +375,7 @@ export default function Dashboard() {
       case "pending": return "border-gray-400"
       case "completed": return "border-green-500"
       case "missed": return "border-red-500"
+      case "skipped": return "border-orange-400"
       default: return "border-gray-400"
     }
   }
@@ -511,12 +513,19 @@ export default function Dashboard() {
 
 
   // Form handlers
+  // Helper function to renumber injects based on due time order
+  const renumberInjects = (injectsList: InjectItem[]): InjectItem[] => {
+    return injectsList
+      .sort((a, b) => a.dueSeconds - b.dueSeconds)
+      .map((inject, index) => ({ ...inject, number: index + 1 }))
+  }
+
   const handleAddInject = (title: string, dueTime: string, type: InjectType, to: string, from: string) => {
     const dueSeconds = parseHMS(dueTime)
     if (dueSeconds !== null && title.trim() && to.trim() && from.trim()) {
       const newInject: InjectItem = {
         id: `i${Date.now()}`,
-        number: injects.length + 1, // Auto-increment inject number
+        number: 1, // Temporary number, will be renumbered
         title: title.trim(),
         dueSeconds,
         type,
@@ -524,8 +533,48 @@ export default function Dashboard() {
         to: to.trim(),
         from: from.trim()
       }
-      setInjects(prev => [...prev, newInject])
+      setInjects(prev => renumberInjects([...prev, newInject]))
     }
+  }
+
+  // Inject management functions
+  const handleDeleteInject = (id: string) => {
+    setInjects(prev => renumberInjects(prev.filter(inject => inject.id !== id)))
+  }
+
+  const handleSkipInject = (id: string) => {
+    setInjects(prev => 
+      prev.map(inject => 
+        inject.id === id 
+          ? { ...inject, status: "skipped" as const }
+          : inject
+      )
+    )
+  }
+
+  const handleMoveInject = (id: string, direction: 'up' | 'down') => {
+    setInjects(prev => {
+      const sorted = [...prev].sort((a, b) => a.dueSeconds - b.dueSeconds)
+      const index = sorted.findIndex(inject => inject.id === id)
+      
+      if (index === -1) return prev
+      if (direction === 'up' && index === 0) return prev
+      if (direction === 'down' && index === sorted.length - 1) return prev
+      
+      const newIndex = direction === 'up' ? index - 1 : index + 1
+      const targetInject = sorted[newIndex]
+      
+      // Swap due times to maintain order
+      const currentInject = sorted[index]
+      const newDueSeconds = targetInject.dueSeconds
+      const targetNewDueSeconds = currentInject.dueSeconds
+      
+      return renumberInjects(prev.map(inject => {
+        if (inject.id === id) return { ...inject, dueSeconds: newDueSeconds }
+        if (inject.id === targetInject.id) return { ...inject, dueSeconds: targetNewDueSeconds }
+        return inject
+      }))
+    })
   }
 
   const handleAddResource = (label: string, etaMinutes: number) => {
@@ -642,7 +691,7 @@ export default function Dashboard() {
     if (validationErrors.length > 0 || previewInjects.length === 0) return
     
     if (importMode === 'replace') {
-      setInjects(previewInjects)
+      setInjects(renumberInjects(previewInjects))
     } else {
       // Append mode - check for duplicates
       const existingKeys = new Set(injects.map(i => `${i.title}:${i.dueSeconds}`))
@@ -650,7 +699,7 @@ export default function Dashboard() {
         !existingKeys.has(`${inject.title}:${inject.dueSeconds}`)
       )
       
-      setInjects(prev => [...prev, ...newInjects])
+      setInjects(prev => renumberInjects([...prev, ...newInjects]))
       
       // Show toast with summary (simplified for now)
       const duplicateCount = previewInjects.length - newInjects.length
@@ -751,16 +800,16 @@ export default function Dashboard() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">To</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">From</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Action</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {injects.map((inject) => (
+              {[...injects].sort((a, b) => a.dueSeconds - b.dueSeconds).map((inject, sortedIndex) => (
                 <tr 
                   key={inject.id} 
                   className={`border-t border-gray-600 ${
                     isCurrentInject(inject) ? 'bg-yellow-900 bg-opacity-30' : ''
-                  }`}
+                  } ${inject.status === 'skipped' ? 'opacity-60' : ''}`}
                 >
                   <td className="px-4 py-3 text-sm font-mono text-white font-semibold">
                     #{inject.number}
@@ -768,7 +817,7 @@ export default function Dashboard() {
                   <td className="px-4 py-3 text-sm font-mono text-white">
                     {formatHMS(inject.dueSeconds)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">{inject.title}</td>
+                  <td className={`px-4 py-3 text-sm text-white ${inject.status === 'skipped' ? 'line-through' : ''}`}>{inject.title}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getInjectTypeColor(inject.type)}`}>
                       {inject.type}
@@ -782,16 +831,58 @@ export default function Dashboard() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleToggleInjectStatus(inject.id)}
-                      className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
-                        inject.status === 'completed' 
-                          ? 'bg-orange-600 hover:bg-orange-700 text-white' 
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                      }`}
-                    >
-                      {inject.status === 'completed' ? 'Mark Incomplete' : 'Mark Complete'}
-                    </button>
+                    <div className="flex gap-1">
+                      {/* Move Up/Down */}
+                      <button
+                        onClick={() => handleMoveInject(inject.id, 'up')}
+                        disabled={sortedIndex === 0}
+                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => handleMoveInject(inject.id, 'down')}
+                        disabled={sortedIndex === injects.length - 1}
+                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      
+                      {/* Complete/Incomplete */}
+                      <button
+                        onClick={() => handleToggleInjectStatus(inject.id)}
+                        disabled={inject.status === 'skipped'}
+                        className={`px-2 py-1 text-xs font-semibold rounded transition-colors disabled:opacity-50 ${
+                          inject.status === 'completed' 
+                            ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                        title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
+                      >
+                        {inject.status === 'completed' ? '↶' : '✓'}
+                      </button>
+                      
+                      {/* Skip */}
+                      <button
+                        onClick={() => handleSkipInject(inject.id)}
+                        disabled={inject.status === 'skipped' || inject.status === 'completed'}
+                        className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
+                        title="Skip inject"
+                      >
+                        ⊘
+                      </button>
+                      
+                      {/* Delete */}
+                      <button
+                        onClick={() => handleDeleteInject(inject.id)}
+                        className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                        title="Delete inject"
+                      >
+                        🗑
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
