@@ -278,6 +278,10 @@ export default function Dashboard() {
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // Inline editing state
+  const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
+  const [editingValue, setEditingValue] = useState<string>('')
+
   // Filter state
   const [showInjects, setShowInjects] = useState(true)
   const [showResources, setShowResources] = useState(true)
@@ -577,6 +581,72 @@ export default function Dashboard() {
     })
   }
 
+  // Inline editing functions
+  const handleStartEdit = (id: string, field: string, currentValue: string | number) => {
+    setEditingField({ id, field })
+    setEditingValue(String(currentValue))
+  }
+
+  const handleCancelEdit = () => {
+    setEditingField(null)
+    setEditingValue('')
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingField) return
+
+    const { id, field } = editingField
+    const value = editingValue.trim()
+
+    setInjects(prev => {
+      const updated = prev.map(inject => {
+        if (inject.id !== id) return inject
+
+        switch (field) {
+          case 'number': {
+            const newNumber = parseInt(value)
+            if (isNaN(newNumber) || newNumber < 1) return inject
+            return { ...inject, number: newNumber }
+          }
+          case 'dueTime': {
+            const dueSeconds = parseHMS(value)
+            if (dueSeconds === null) return inject
+            return { ...inject, dueSeconds }
+          }
+          case 'title':
+            if (!value) return inject
+            return { ...inject, title: value }
+          case 'type':
+            if (!['in person', 'radio/phone', 'electronic', 'other'].includes(value)) return inject
+            return { ...inject, type: value as InjectType }
+          case 'to':
+            return { ...inject, to: value }
+          case 'from':
+            return { ...inject, from: value }
+          default:
+            return inject
+        }
+      })
+
+      // Re-number based on due time order if time or number was changed
+      if (field === 'dueTime') {
+        return renumberInjects(updated)
+      }
+      return updated
+    })
+
+    setEditingField(null)
+    setEditingValue('')
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit()
+    } else if (e.key === 'Escape') {
+      handleCancelEdit()
+    }
+  }
+
   const handleAddResource = (label: string, etaMinutes: number) => {
     if (label.trim() && etaMinutes >= 0) {
       const newResource: ResourceItem = {
@@ -785,6 +855,66 @@ export default function Dashboard() {
   }
 
 
+  // Editable field component
+  const EditableField = ({ 
+    inject, 
+    field, 
+    value, 
+    displayValue, 
+    isSelect = false, 
+    selectOptions = [] 
+  }: {
+    inject: InjectItem
+    field: string
+    value: string | number
+    displayValue?: string
+    isSelect?: boolean
+    selectOptions?: string[]
+  }) => {
+    const isEditing = editingField?.id === inject.id && editingField?.field === field
+    
+    if (isEditing) {
+      if (isSelect) {
+        return (
+          <select
+            value={editingValue}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={handleSaveEdit}
+            onKeyDown={handleKeyPress}
+            className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-500"
+            autoFocus
+          >
+            {selectOptions.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        )
+      }
+      
+      return (
+        <input
+          type="text"
+          value={editingValue}
+          onChange={(e) => setEditingValue(e.target.value)}
+          onBlur={handleSaveEdit}
+          onKeyDown={handleKeyPress}
+          className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-500"
+          autoFocus
+        />
+      )
+    }
+    
+    return (
+      <div
+        onClick={() => handleStartEdit(inject.id, field, value)}
+        className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 px-2 py-1 rounded transition-colors"
+        title="Click to edit"
+      >
+        {displayValue || value}
+      </div>
+    )
+  }
+
   const InjectList = () => {
     return (
       <div className="bg-gray-800 rounded-lg p-6">
@@ -812,19 +942,72 @@ export default function Dashboard() {
                   } ${inject.status === 'skipped' ? 'opacity-60' : ''}`}
                 >
                   <td className="px-4 py-3 text-sm font-mono text-white font-semibold">
-                    #{inject.number}
+                    <EditableField
+                      inject={inject}
+                      field="number"
+                      value={inject.number}
+                      displayValue={`#${inject.number}`}
+                    />
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-white">
-                    {formatHMS(inject.dueSeconds)}
+                    <EditableField
+                      inject={inject}
+                      field="dueTime"
+                      value={formatHMS(inject.dueSeconds)}
+                      displayValue={formatHMS(inject.dueSeconds)}
+                    />
                   </td>
-                  <td className={`px-4 py-3 text-sm text-white ${inject.status === 'skipped' ? 'line-through' : ''}`}>{inject.title}</td>
+                  <td className={`px-4 py-3 text-sm text-white ${inject.status === 'skipped' ? 'line-through' : ''}`}>
+                    <EditableField
+                      inject={inject}
+                      field="title"
+                      value={inject.title}
+                      displayValue={inject.title}
+                    />
+                  </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getInjectTypeColor(inject.type)}`}>
-                      {inject.type}
-                    </span>
+                    {editingField?.id === inject.id && editingField?.field === 'type' ? (
+                      <select
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        onBlur={handleSaveEdit}
+                        onKeyDown={handleKeyPress}
+                        className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-500"
+                        autoFocus
+                      >
+                        <option value="in person">in person</option>
+                        <option value="radio/phone">radio/phone</option>
+                        <option value="electronic">electronic</option>
+                        <option value="other">other</option>
+                      </select>
+                    ) : (
+                      <div
+                        onClick={() => handleStartEdit(inject.id, 'type', inject.type)}
+                        className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 px-2 py-1 rounded transition-colors"
+                        title="Click to edit"
+                      >
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getInjectTypeColor(inject.type)}`}>
+                          {inject.type}
+                        </span>
+                      </div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">{inject.to || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-white">{inject.from || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    <EditableField
+                      inject={inject}
+                      field="to"
+                      value={inject.to || ''}
+                      displayValue={inject.to || '-'}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    <EditableField
+                      inject={inject}
+                      field="from"
+                      value={inject.from || ''}
+                      displayValue={inject.from || '-'}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getInjectStatusColor(inject.status)}`}>
                       {inject.status}
