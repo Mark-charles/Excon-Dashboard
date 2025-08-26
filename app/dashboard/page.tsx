@@ -85,6 +85,7 @@ const ExerciseHeader = React.memo<{
     </div>
   )
 })
+ExerciseHeader.displayName = 'ExerciseHeader'
 
 // Add Inject Form Component
 const AddInjectForm = React.memo<{
@@ -182,6 +183,7 @@ const AddInjectForm = React.memo<{
     </div>
   )
 })
+AddInjectForm.displayName = 'AddInjectForm'
 
 // Add Resource Form Component  
 const AddResourceForm = React.memo<{
@@ -231,6 +233,7 @@ const AddResourceForm = React.memo<{
     </div>
   )
 })
+AddResourceForm.displayName = 'AddResourceForm'
 
 export default function Dashboard() {
   // Exercise info
@@ -518,13 +521,13 @@ export default function Dashboard() {
 
   // Form handlers
   // Helper function to renumber injects based on due time order
-  const renumberInjects = (injectsList: InjectItem[]): InjectItem[] => {
+  const renumberInjects = useCallback((injectsList: InjectItem[]): InjectItem[] => {
     return injectsList
       .sort((a, b) => a.dueSeconds - b.dueSeconds)
       .map((inject, index) => ({ ...inject, number: index + 1 }))
-  }
+  }, [])
 
-  const handleAddInject = (title: string, dueTime: string, type: InjectType, to: string, from: string) => {
+  const handleAddInject = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string) => {
     const dueSeconds = parseHMS(dueTime)
     if (dueSeconds !== null && title.trim() && to.trim() && from.trim()) {
       const newInject: InjectItem = {
@@ -539,7 +542,7 @@ export default function Dashboard() {
       }
       setInjects(prev => renumberInjects([...prev, newInject]))
     }
-  }
+  }, [renumberInjects])
 
   // Inject management functions
   const handleDeleteInject = (id: string) => {
@@ -647,7 +650,7 @@ export default function Dashboard() {
     }
   }
 
-  const handleAddResource = (label: string, etaMinutes: number) => {
+  const handleAddResource = useCallback((label: string, etaMinutes: number) => {
     if (label.trim() && etaMinutes >= 0) {
       const newResource: ResourceItem = {
         id: `r${Date.now()}`,
@@ -657,7 +660,7 @@ export default function Dashboard() {
       }
       setResources(prev => [...prev, newResource])
     }
-  }
+  }, [currentSeconds])
 
   // Import handlers
   const handleFileSelect = async (file: File) => {
