@@ -303,11 +303,11 @@ export default function Dashboard() {
   // Stable callback functions for forms
   const handleAddInjectCallback = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string) => {
     handleAddInject(title, dueTime, type, to, from)
-  }, [])
+  }, [handleAddInject])
   
   const handleAddResourceCallback = useCallback((label: string, minutes: number) => {
     handleAddResource(label, minutes)
-  }, [])
+  }, [handleAddResource])
   
   const handleImportClickCallback = useCallback(() => {
     setShowImportModal(true)
@@ -1732,7 +1732,7 @@ export default function Dashboard() {
                 {previewResources.slice(0, 10).map((resource, index) => (
                   <tr key={index} className="border-b border-gray-700">
                     <td className="p-2 text-white">{resource.label}</td>
-                    <td className="p-2 text-white">{resource.eta} min</td>
+                    <td className="p-2 text-white">{Math.max(0, Math.round((resource.etaSeconds - currentSeconds) / 60))} min</td>
                     <td className="p-2">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
                         resource.status === 'requested' ? 'bg-yellow-600 text-yellow-100' :
