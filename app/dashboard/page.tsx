@@ -303,11 +303,11 @@ export default function Dashboard() {
   // Stable callback functions for forms
   const handleAddInjectCallback = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string) => {
     handleAddInject(title, dueTime, type, to, from)
-  }, [handleAddInject])
+  }, [])
   
   const handleAddResourceCallback = useCallback((label: string, minutes: number) => {
     handleAddResource(label, minutes)
-  }, [handleAddResource])
+  }, [])
   
   const handleImportClickCallback = useCallback(() => {
     setShowImportModal(true)
