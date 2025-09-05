@@ -1,6 +1,8 @@
-'use client'
+﻿"use client"
+"use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { User, Users, Phone, Cpu, MapPin, Tag, ClipboardCheck, Truck, CheckCircle2, XCircle, Clock, Plane, Cog, Package } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 type InjectType = "in person" | "radio/phone" | "electronic" | "map inject" | "other"
@@ -18,11 +20,14 @@ type InjectItem = {
   from: string
 }
 
+type ResourceKind = 'person' | 'vehicle' | 'group' | 'air' | 'capability' | 'supply'
+
 type ResourceItem = {
   id: string
   label: string
   etaSeconds: number
   status: ResourceStatus
+  kind?: ResourceKind
 }
 
 const initialInjects: InjectItem[] = []
@@ -151,7 +156,7 @@ const AddInjectForm = React.memo<{
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           required
         />
         <input
@@ -159,13 +164,13 @@ const AddInjectForm = React.memo<{
           placeholder="Due Time (HH:MM:SS)"
           value={dueTime}
           onChange={(e) => setDueTime(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 text-white rounded font-mono"
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           required
         />
         <select
           value={type}
           onChange={(e) => setType(e.target.value as InjectType)}
-          className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
         >
           <option value="in person">In Person</option>
           <option value="radio/phone">Radio/Phone</option>
@@ -179,7 +184,7 @@ const AddInjectForm = React.memo<{
             placeholder="From"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+            className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
             required
           />
           <input
@@ -187,7 +192,7 @@ const AddInjectForm = React.memo<{
             placeholder="To"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+            className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
             required
           />
         </div>
@@ -217,21 +222,23 @@ AddInjectForm.displayName = 'AddInjectForm'
 
 // Add Resource Form Component  
 const AddResourceForm = React.memo<{
-  onAddResource: (label: string, minutes: number) => void
+  onAddResource: (label: string, minutes: number, kind: ResourceKind) => void
   onImportClick: () => void
 }>(({ onAddResource, onImportClick }) => {
   const [label, setLabel] = useState('')
   const [etaMinutes, setEtaMinutes] = useState('')
+  const [kind, setKind] = useState<ResourceKind>('vehicle')
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     const minutes = parseInt(etaMinutes, 10)
     if (label.trim() && !isNaN(minutes) && minutes >= 0) {
-      onAddResource(label, minutes)
+      onAddResource(label, minutes, kind)
       setLabel('')
       setEtaMinutes('')
+      setKind('vehicle')
     }
-  }, [label, etaMinutes, onAddResource])
+  }, [label, etaMinutes, kind, onAddResource])
 
   return (
     <div className="bg-gray-800 rounded-lg p-6">
@@ -245,18 +252,33 @@ const AddResourceForm = React.memo<{
           placeholder="Resource Label"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           required
         />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as ResourceKind)}
+            className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
+            aria-label="Resource kind"
+          >
+            <option value="person">Person/Position</option>
+            <option value="vehicle">Vehicle/Unit</option>
+            <option value="group">Task Force/Strike Team</option>
+            <option value="air">Air Support</option>
+            <option value="capability">Capability</option>
+            <option value="supply">Supplies/Food</option>
+          </select>
         <input
           type="number"
           placeholder="ETA (minutes)"
           value={etaMinutes}
           onChange={(e) => setEtaMinutes(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           min="0"
           required
         />
+        </div>
         <div className="flex gap-2">
           <button
             type="submit"
@@ -305,8 +327,8 @@ export default function Dashboard() {
     handleAddInject(title, dueTime, type, to, from)
   }, [])
   
-  const handleAddResourceCallback = useCallback((label: string, minutes: number) => {
-    handleAddResource(label, minutes)
+  const handleAddResourceCallback = useCallback((label: string, minutes: number, kind: ResourceKind) => {
+    handleAddResource(label, minutes, kind)
   }, [])
   
   const handleImportClickCallback = useCallback(() => {
@@ -322,6 +344,42 @@ export default function Dashboard() {
   const [isRunning, setIsRunning] = useState(false)
   const [injects, setInjects] = useState<InjectItem[]>(initialInjects)
   const [resources, setResources] = useState<ResourceItem[]>([])
+  
+  // Shared focus-visible ring style for accessibility
+  const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
+
+  // Local persistence of key state
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('excon-dashboard-state-v1') : null
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        if (typeof parsed.exerciseName === 'string') setExerciseName(parsed.exerciseName)
+        if (typeof parsed.controllerName === 'string') setControllerName(parsed.controllerName)
+        if (typeof parsed.exerciseFinishTime === 'string') setExerciseFinishTime(parsed.exerciseFinishTime)
+        if (Array.isArray(parsed.injects)) setInjects(parsed.injects as InjectItem[])
+        if (Array.isArray(parsed.resources)) setResources(parsed.resources as ResourceItem[])
+        if (typeof parsed.currentSeconds === 'number' && parsed.currentSeconds >= 0) setCurrentSeconds(parsed.currentSeconds)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      const state = {
+        exerciseName,
+        controllerName,
+        exerciseFinishTime,
+        currentSeconds,
+        injects,
+        resources,
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('excon-dashboard-state-v1', JSON.stringify(state))
+      }
+    } catch {}
+  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, injects, resources])
   
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false)
@@ -384,7 +442,6 @@ export default function Dashboard() {
     )
   }, [currentSeconds])
 
-  // Auto-check for arrived resources
   useEffect(() => {
     setResources(prevResources => 
       prevResources.map(resource => 
@@ -444,19 +501,7 @@ export default function Dashboard() {
       default: return "bg-gray-500"
     }
   }
-
-  const getInjectTypeEmoji = (type: InjectType): string => {
-    switch (type) {
-      case "in person": return "👤"
-      case "radio/phone": return "📞"
-      case "electronic": return "💻"
-      case "map inject": return "🗺️"
-      case "other": return "❓"
-      default: return "❓"
-    }
-  }
-
-  const getInjectTypeTextColor = (type: InjectType): string => {
+const getInjectTypeTextColor = (type: InjectType): string => {
     switch (type) {
       case "in person": return "text-blue-400"
       case "radio/phone": return "text-green-400"
@@ -464,17 +509,6 @@ export default function Dashboard() {
       case "map inject": return "text-red-400"
       case "other": return "text-orange-400"
       default: return "text-gray-400"
-    }
-  }
-
-  const getResourceStatusEmoji = (status: ResourceStatus): string => {
-    switch (status) {
-      case "requested": return "❔"
-      case "tasked": return "📋"
-      case "enroute": return "🚗"
-      case "arrived": return "✅"
-      case "cancelled": return "❌"
-      default: return "❔"
     }
   }
 
@@ -489,6 +523,44 @@ export default function Dashboard() {
     }
   }
 
+  // Icon helpers (SVG components via lucide-react)
+  const getInjectTypeIcon = (type: InjectType) => {
+    const props = { size: 16, className: "inline align-middle" }
+    switch (type) {
+      case 'in person': return <User {...props} />
+      case 'radio/phone': return <Phone {...props} />
+      case 'electronic': return <Cpu {...props} />
+      case 'map inject': return <MapPin {...props} />
+      case 'other': return <Tag {...props} />
+      default: return <Tag {...props} />
+    }
+  }
+
+  const getResourceStatusIcon = (status: ResourceStatus) => {
+    const props = { size: 16, className: "inline align-middle" }
+    switch (status) {
+      case 'requested': return <Clock {...props} />
+      case 'tasked': return <ClipboardCheck {...props} />
+      case 'enroute': return <Truck {...props} />
+      case 'arrived': return <CheckCircle2 {...props} />
+      case 'cancelled': return <XCircle {...props} />
+      default: return <Tag {...props} />
+    }
+  }
+
+
+  const getResourceKindIcon = (kind?: ResourceKind) => {
+    const props = { size: 16, className: "inline align-middle" }
+    switch (kind) {
+      case 'person': return <User {...props} />
+      case 'vehicle': return <Truck {...props} />
+      case 'group': return <Users {...props} />
+      case 'air': return <Plane {...props} />
+      case 'capability': return <Cog {...props} />
+      case 'supply': return <Package {...props} />
+      default: return <Truck {...props} />
+    }
+  }
   const isCurrentInject = (inject: InjectItem): boolean => {
     const timeDiff = Math.abs(currentSeconds - inject.dueSeconds)
     return timeDiff <= 30
@@ -733,13 +805,14 @@ export default function Dashboard() {
     }
   }
 
-  const handleAddResource = useCallback((label: string, etaMinutes: number) => {
+  const handleAddResource = useCallback((label: string, etaMinutes: number, kind: ResourceKind) => {
     if (label.trim() && etaMinutes >= 0) {
       const newResource: ResourceItem = {
         id: `r${Date.now()}`,
         label: label.trim(),
         etaSeconds: currentSeconds + (etaMinutes * 60),
-        status: "requested"
+        status: "requested",
+        kind
       }
       setResources(prev => [...prev, newResource])
     }
@@ -955,12 +1028,21 @@ export default function Dashboard() {
         if (['requested', 'tasked', 'enroute', 'arrived', 'cancelled'].includes(statusStr)) {
           status = statusStr as ResourceStatus
         }
+        // Infer kind from label (simple heuristics)
+        const lower = label.toLowerCase()
+        let kind: ResourceKind = 'vehicle'
+        if (/(officer|chief|president|planner|liaison)/.test(lower)) kind = 'person'
+        else if (/(task\s*force|strike\s*team|group)/.test(lower)) kind = 'group'
+        else if (/(heli|air|plane|chopper)/.test(lower)) kind = 'air'
+        else if (/(drone|uav|robot|capability)/.test(lower)) kind = 'capability'
+        else if (/(food|catering|water|suppl|meals|rations|feed)/.test(lower)) kind = 'supply'
         
         validResources.push({
           id: generateId(),
           label,
           etaSeconds: currentSeconds + (etaMinutes * 60),
-          status
+          status,
+          kind
         })
       })
       
@@ -1039,14 +1121,14 @@ export default function Dashboard() {
           <div className="flex gap-4 justify-center mb-6">
             <button
               onClick={handleStartStop}
-              className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]"
+              className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
             >
               {isRunning ? 'Stop' : 'Start'}
             </button>
             
             <button
               onClick={handleReset}
-              className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white min-w-[120px]"
+              className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white min-w-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
             >
               Reset
             </button>
@@ -1058,7 +1140,7 @@ export default function Dashboard() {
               placeholder="HH:MM:SS"
               value={manualTime}
               onChange={(e) => setManualTime(e.target.value)}
-              className="px-3 py-2 bg-gray-700 text-white rounded font-mono text-center w-32"
+              className="px-3 py-2 bg-gray-700 text-white rounded font-mono text-center w-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
             />
             <button
               type="submit"
@@ -1238,51 +1320,54 @@ export default function Dashboard() {
                       <button
                         onClick={() => handleMoveInject(inject.id, 'up')}
                         disabled={sortedIndex === 0}
-                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
+                        className={`px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded ${focusRing}`}
                         title="Move up"
+                        aria-label={`Move inject #${inject.number} up`}
                       >
-                        ↑
+                        Up
                       </button>
                       <button
                         onClick={() => handleMoveInject(inject.id, 'down')}
                         disabled={sortedIndex === injects.length - 1}
-                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
+                        className={`px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded ${focusRing}`}
                         title="Move down"
+                        aria-label={`Move inject #${inject.number} down`}
                       >
-                        ↓
+                        Down
                       </button>
                       
                       {/* Complete/Incomplete */}
                       <button
                         onClick={() => handleToggleInjectStatus(inject.id)}
                         disabled={inject.status === 'skipped'}
-                        className={`px-2 py-1 text-xs font-semibold rounded transition-colors disabled:opacity-50 ${
+                        className={`px-2 py-1 text-xs font-semibold rounded transition-colors disabled:opacity-50 ${focusRing} ${
                           inject.status === 'completed' 
                             ? 'bg-orange-600 hover:bg-orange-700 text-white' 
                             : 'bg-green-600 hover:bg-green-700 text-white'
                         }`}
                         title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
+                        aria-label={inject.status === 'completed' ? `Mark inject #${inject.number} incomplete` : `Mark inject #${inject.number} complete`}
                       >
-                        {inject.status === 'completed' ? '↶' : '✓'}
+                        {inject.status === 'completed' ? 'Undo' : 'Done'}
                       </button>
-                      
                       {/* Skip */}
                       <button
                         onClick={() => handleSkipInject(inject.id)}
                         disabled={inject.status === 'skipped' || inject.status === 'completed'}
-                        className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
+                        className={`px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded ${focusRing}`}
                         title="Skip inject"
+                        aria-label={`Skip inject #${inject.number}`}
                       >
-                        ⊘
+                        Skip
                       </button>
-                      
                       {/* Delete */}
                       <button
                         onClick={() => handleDeleteInject(inject.id)}
-                        className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                        className={`px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded ${focusRing}`}
                         title="Delete inject"
+                        aria-label={`Delete inject #${inject.number}`}
                       >
-                        🗑
+                        Delete
                       </button>
                     </div>
                   </td>
@@ -1331,7 +1416,13 @@ export default function Dashboard() {
             <tbody>
               {resources.map((resource) => (
                 <tr key={resource.id} className="border-t border-gray-600">
-                  <td className="px-4 py-3 text-sm text-white">{resource.label}</td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    <span className="inline-flex items-center gap-2">
+                      {getResourceStatusIcon(resource.status)}
+                      {resource.kind && <span className="opacity-80">{getResourceKindIcon(resource.kind)}</span>}
+                      <span>{resource.label}</span>
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-sm font-mono text-white">
                     {editingResource === resource.id ? (
                       <div className="flex gap-2 items-center">
@@ -1516,13 +1607,19 @@ export default function Dashboard() {
   const ValidationList = () => {
     if (validationErrors.length === 0) return null
 
+    const displayErrors = validationErrors.slice(0, 50)
+    const remaining = validationErrors.length - displayErrors.length
+
     return (
-      <div className="mt-4">
+      <div className="mt-4" aria-live="polite">
         <h4 className="text-lg font-semibold text-red-400 mb-3">Validation Errors ({validationErrors.length})</h4>
         <div className="max-h-32 overflow-y-auto bg-red-900 bg-opacity-20 border border-red-600 rounded p-3">
-          {validationErrors.map((error, index) => (
+          {displayErrors.map((error, index) => (
             <div key={index} className="text-red-400 text-sm mb-1">{error}</div>
           ))}
+          {remaining > 0 && (
+            <div className="text-red-300 text-xs mt-2">... and {remaining} more. Fix top issues first.</div>
+          )}
         </div>
       </div>
     )
@@ -1672,8 +1769,11 @@ export default function Dashboard() {
           onDragOver={handleDragOver}
           className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-gray-500 transition-colors cursor-pointer"
         >
-          <div className="text-4xl mb-4">📋</div>
-          <p className="text-white mb-2">Drop your resource file here, or</p>
+          <div className="mb-4">
+            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
           <input
             type="file"
             accept=".xlsx,.csv"
@@ -1704,7 +1804,7 @@ export default function Dashboard() {
           <ul className="text-red-400 text-sm space-y-1">
             {resourceValidationErrors.map((error, index) => (
               <li key={index} className="flex items-start gap-2">
-                <span className="text-red-500">•</span>
+                <span className="text-red-500">-</span>
                 <span>{error}</span>
               </li>
             ))}
@@ -1890,7 +1990,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowInjects(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-white text-sm">📋 Injects</span>
+                <span className="text-white text-sm">Injects</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1899,7 +1999,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowResources(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-white text-sm">🚛 Resources</span>
+                <span className="text-white text-sm">Resources</span>
               </label>
             </div>
           </div>
@@ -1915,7 +2015,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowInPerson(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-blue-400 text-sm">👤 In Person</span>
+                <span className="inline-flex items-center gap-1 text-blue-400"><User size={14} className="inline" /> In Person</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1924,7 +2024,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowRadioPhone(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-green-400 text-sm">📞 Radio/Phone</span>
+                <span className="inline-flex items-center gap-1 text-green-400"><Phone size={14} className="inline" /> Radio/Phone</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1933,7 +2033,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowElectronic(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-purple-400 text-sm">💻 Electronic</span>
+                <span className="inline-flex items-center gap-1 text-purple-400"><Cpu size={14} className="inline" /> Electronic</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1942,7 +2042,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowMapInject(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-red-400 text-sm">🗺️ Map Inject</span>
+                <span className="text-red-400 text-sm"><MapPin size={14} className="inline" /> Map Inject</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1951,7 +2051,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowOther(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-orange-400 text-sm">❓ Other</span>
+                <span className="text-orange-400 text-sm"><Tag size={14} className="inline" /> Other</span>
               </label>
             </div>
           </div>
@@ -1967,7 +2067,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowRequestedStatus(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-gray-400 text-sm">❔ Requested</span>
+                <span className="text-gray-400 text-sm"><Clock size={14} className="inline" /> Requested</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1976,7 +2076,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowTaskedStatus(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-amber-400 text-sm">📋 Tasked</span>
+                <span className="text-amber-400 text-sm"><ClipboardCheck size={14} className="inline" /> Tasked</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1985,7 +2085,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowEnrouteStatus(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-blue-400 text-sm">🚗 Enroute</span>
+                <span className="text-blue-400 text-sm"><Truck size={14} className="inline" /> Enroute</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -1994,7 +2094,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowArrivedStatus(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-green-400 text-sm">✅ Arrived</span>
+                <span className="text-green-400 text-sm"><CheckCircle2 size={14} className="inline" /> Arrived</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -2003,7 +2103,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowCancelledStatus(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-red-400 text-sm">❌ Cancelled</span>
+                <span className="text-red-400 text-sm"><XCircle size={14} className="inline" /> Cancelled</span>
               </label>
             </div>
           </div>
@@ -2131,12 +2231,12 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-white">Timeline</h3>
           <div className="flex gap-4 text-sm flex-wrap">
-            <span className="text-blue-400">👤 In Person</span>
-            <span className="text-green-400">📞 Radio/Phone</span>
-            <span className="text-purple-400">💻 Electronic</span>
-            <span className="text-red-400">🗺️ Map Inject</span>
-            <span className="text-orange-400">❓ Other</span>
-            <span className="text-gray-400">🚛 Resources</span>
+            <span className="inline-flex items-center gap-1 text-blue-400"><User size={14} className="inline" /> In Person</span>
+            <span className="inline-flex items-center gap-1 text-green-400"><Phone size={14} className="inline" /> Radio/Phone</span>
+            <span className="inline-flex items-center gap-1 text-purple-400"><Cpu size={14} className="inline" /> Electronic</span>
+            <span className="inline-flex items-center gap-1 text-red-400"><MapPin size={14} className="inline" /> Map Inject</span>
+            <span className="inline-flex items-center gap-1 text-orange-400"><Tag size={14} className="inline" /> Other</span>
+            <span className="text-gray-400">Resources</span>
           </div>
         </div>
         
@@ -2192,8 +2292,8 @@ export default function Dashboard() {
                         : `${stack.items[0].label} - ETA: ${formatHMS(stack.items[0].etaSeconds)} (${stack.items[0].status})`}
                     >
                       {'dueSeconds' in stack.items[0] 
-                        ? getInjectTypeEmoji(stack.items[0].type)
-                        : getResourceStatusEmoji(stack.items[0].status)}
+                        ? getInjectTypeIcon(stack.items[0].type)
+                        : getResourceKindIcon(stack.items[0].kind)}
                     </div>
                   ) : (
                     // Stacked items
@@ -2212,8 +2312,8 @@ export default function Dashboard() {
                             : `${item.label} - ETA: ${formatHMS(item.etaSeconds)} (${item.status})`}
                         >
                           {'dueSeconds' in item 
-                            ? getInjectTypeEmoji(item.type)
-                            : getResourceStatusEmoji(item.status)}
+                            ? getInjectTypeIcon(item.type)
+                            : getResourceKindIcon(item.kind)}
                         </div>
                       ))}
                       {/* Stack indicator */}
@@ -2311,3 +2411,15 @@ export default function Dashboard() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
