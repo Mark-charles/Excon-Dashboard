@@ -6,8 +6,8 @@
 
 ## Roadmap (Phased)
 ### Phase 0 — Stabilize Current MVP
-- [ ] Fix encoding artifacts (icons/emojis) in `app/dashboard/page.tsx` action buttons.
-- [ ] Persist state locally (injects, resources, timer) via browser storage.
+- [x] Persist state locally (injects, resources, timer) via browser storage.
+- [ ] Fix encoding artifacts in docs and any UI labels.
 - [ ] Improve import validation messages and highlight offending rows.
 - [ ] Accessibility pass: focus states, ARIA labels, color contrast.
 

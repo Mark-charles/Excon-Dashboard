@@ -1,37 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Excon Dashboard
 
-## Getting Started
+Exercise Control Dashboard for planning and running emergency/incident exercises. Provides inject scheduling (MSEL), resource tasking, a live exercise timer, CSV/XLSX import, and local persistence.
 
-First, run the development server:
+## Quick Start
+- Prereqs: Node.js LTS (>= 18) and npm
+- Install: `npm install`
+- Dev: `npm run dev` then open `http://localhost:3000` (redirects to `/dashboard`)
+- Build: `npm run build`
+- Start: `npm start`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Features
+- Exercise timer: start/stop/reset, manual set (HH:MM:SS)
+- Injects: add/edit/reorder; CSV/XLSX import with validation, templates, and preview
+- Resources: add/edit; CSV/XLSX import with validation, templates, and preview
+- Local persistence: state stored in `localStorage` and rehydrated on load
+- Filters: inject type and resource status filters for timeline view
+- Accessibility: focus styles and labeled controls
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
+- `app/`: Next.js App Router pages (`/dashboard`), layout, and styles
+- `public/`: Static assets (may be empty)
+- `Resources/`: Reference docs (not used at runtime)
+- Config: `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Import Templates
+Use the built-in “Download Template” buttons in the import dialogs for CSV templates.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Roadmap
+See `plan.md` for phases and upcoming work (templates, export, real-time sync, AAR, mapping).
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# Trigger Vercel deployment

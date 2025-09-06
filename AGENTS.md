@@ -17,7 +17,7 @@ Prereqs: Node.js LTS (>=18) and npm. Install deps with `npm install`.
 ## Coding Style & Naming Conventions
 - Language: TypeScript with strict mode; prefer function components and hooks.
 - Indentation: 2 spaces; keep files small and cohesive.
-- File naming: Route files use Next patterns (`page.tsx`, `layout.tsx`). Shared components (if added) should be PascalCase (e.g., `Button.tsx`).
+- File naming: Route files use Next patterns (`page.tsx`, `layout.tsx`). Shared components should be PascalCase (e.g., `Button.tsx`).
 - Styling: Prefer Tailwind utility classes; keep component styles local and avoid inline styles when utilities exist.
 - Linting: Conform to `next/core-web-vitals` and `next/typescript`. Fix warnings before committing.
 - Client/Server: Use `"use client"` only when needed for interactive components.
