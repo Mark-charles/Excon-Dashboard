@@ -1,8 +1,11 @@
-"use client"
+﻿"use client"
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { User, Users, Phone, Cpu, MapPin, Tag, ClipboardCheck, Truck, CheckCircle2, XCircle, Clock, Plane, Cog, Package } from 'lucide-react'
+
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import { User, Users, Phone, Cpu, MapPin, Tag, ClipboardCheck, Truck, CheckCircle2, XCircle, Clock, Plane, Cog, Package, Volume2, VolumeX, ExternalLink, FileDown } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { publishState, subscribeState } from '@/lib/sync'
 
 type InjectType = "in person" | "radio/phone" | "electronic" | "map inject" | "other"
 type InjectStatus = "pending" | "completed" | "missed" | "skipped"
@@ -17,6 +20,10 @@ type InjectItem = {
   status: InjectStatus
   to: string
   from: string
+  acked?: boolean
+  audioDataUrl?: string
+  audioName?: string
+  autoPlayAudio?: boolean
 }
 
 type ResourceKind = 'person' | 'vehicle' | 'group' | 'air' | 'capability' | 'supply'
@@ -27,6 +34,7 @@ type ResourceItem = {
   etaSeconds: number
   status: ResourceStatus
   kind?: ResourceKind
+  createdAtSeconds?: number
 }
 
 const initialInjects: InjectItem[] = []
@@ -39,7 +47,8 @@ const ExerciseHeader = React.memo<{
   onExerciseNameChange: (value: string) => void
   onControllerNameChange: (value: string) => void
   onFinishTimeChange: (value: string) => void
-}>(({ exerciseName, controllerName, exerciseFinishTime, onExerciseNameChange, onControllerNameChange, onFinishTimeChange }) => {
+  readonly?: boolean
+}>(({ exerciseName, controllerName, exerciseFinishTime, onExerciseNameChange, onControllerNameChange, onFinishTimeChange, readonly = false }) => {
   const handleExerciseNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onExerciseNameChange(e.target.value)
   }, [onExerciseNameChange])
@@ -52,8 +61,35 @@ const ExerciseHeader = React.memo<{
     onFinishTimeChange(e.target.value)
   }, [onFinishTimeChange])
 
+  if (readonly) {
+    return (
+      <div className="bg-gray-800 rounded-lg p-4 mb-6 relative">
+        <Link href="/admin" className="absolute right-3 top-3 text-gray-300 hover:text-white" aria-label="Open Administration">
+          <Cog className="w-5 h-5" />
+        </Link>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-gray-300 mb-1">Exercise Name</span>
+            <span className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600">{exerciseName || '-'}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-gray-300 mb-1">Controller Name</span>
+            <span className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600">{controllerName || '-'}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-gray-300 mb-1">Exercise Finish Time</span>
+            <span className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600">{exerciseFinishTime || '-'}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="bg-gray-800 rounded-lg p-4 mb-6">
+    <div className="bg-gray-800 rounded-lg p-4 mb-6 relative">
+      <Link href="/admin" className="absolute right-3 top-3 text-gray-300 hover:text-white" aria-label="Open Administration">
+        <Cog className="w-5 h-5" />
+      </Link>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="flex flex-col">
           <label className="text-sm font-semibold text-gray-300 mb-1">Exercise Name</label>
@@ -81,7 +117,7 @@ const ExerciseHeader = React.memo<{
             type="text"
             value={exerciseFinishTime}
             onChange={handleFinishTimeChange}
-            className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+            className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             placeholder="HH:MM:SS"
           />
         </div>
@@ -122,26 +158,34 @@ ExerciseOverview.displayName = 'ExerciseOverview'
 
 // Add Inject Form Component
 const AddInjectForm = React.memo<{
-  onAddInject: (title: string, dueTime: string, type: InjectType, to: string, from: string) => void
+  onAddInject: (title: string, dueTime: string, type: InjectType, to: string, from: string, audioDataUrl?: string | null, audioName?: string | null, autoPlayAudio?: boolean) => void
   onImportClick: () => void
-}>(({ onAddInject, onImportClick }) => {
+  disabled?: boolean
+}>(({ onAddInject, onImportClick, disabled = false }) => {
   const [title, setTitle] = useState('')
   const [dueTime, setDueTime] = useState('')
   const [type, setType] = useState<InjectType>('radio/phone')
   const [to, setTo] = useState('')
   const [from, setFrom] = useState('')
+  const [audioName, setAudioName] = useState('')
+  const [audioDataUrl, setAudioDataUrl] = useState<string | null>(null)
+  const [autoPlay, setAutoPlay] = useState(false)
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
+    if (disabled) return
     if (title.trim() && dueTime.trim() && to.trim() && from.trim()) {
-      onAddInject(title, dueTime, type, to, from)
+      onAddInject(title, dueTime, type, to, from, audioDataUrl, audioName, autoPlay)
       setTitle('')
       setDueTime('')
       setType('radio/phone')
       setTo('')
       setFrom('')
+      setAudioDataUrl(null)
+      setAudioName('')
+      setAutoPlay(false)
     }
-  }, [title, dueTime, type, to, from, onAddInject])
+  }, [title, dueTime, type, to, from, onAddInject, audioDataUrl, audioName, autoPlay])
 
   return (
     <div className="bg-gray-800 rounded-lg p-6">
@@ -157,6 +201,7 @@ const AddInjectForm = React.memo<{
           onChange={(e) => setTitle(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           required
+          disabled={disabled}
         />
         <input
           type="text"
@@ -165,11 +210,13 @@ const AddInjectForm = React.memo<{
           onChange={(e) => setDueTime(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 text-white rounded font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           required
+          disabled={disabled}
         />
         <select
           value={type}
           onChange={(e) => setType(e.target.value as InjectType)}
           className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
+          disabled={disabled}
         >
           <option value="in person">In Person</option>
           <option value="radio/phone">Radio/Phone</option>
@@ -185,6 +232,7 @@ const AddInjectForm = React.memo<{
             onChange={(e) => setFrom(e.target.value)}
             className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
             required
+            disabled={disabled}
           />
           <input
             type="text"
@@ -193,21 +241,42 @@ const AddInjectForm = React.memo<{
             onChange={(e) => setTo(e.target.value)}
             className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
             required
+            disabled={disabled}
           />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-center">
+          <div className="flex items-center gap-2">
+            <input id="inject-audio-file" type="file" accept="audio/*" className="hidden" onChange={async (e)=>{
+              const f = e.target.files?.[0]
+              if (f) {
+                const reader = new FileReader()
+                reader.onload = () => { setAudioDataUrl(String(reader.result)); setAudioName(f.name) }
+                reader.readAsDataURL(f)
+              }
+            }} />
+            <label htmlFor="inject-audio-file" className={`px-3 py-2 ${disabled ? 'bg-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 cursor-pointer'} text-white rounded`}>{audioName ? 'Change Audio' : 'Attach Audio'}</label>
+            {audioName && <span className="text-gray-300 text-sm truncate max-w-[180px]" title={audioName}>{audioName}</span>}
+          </div>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={autoPlay} onChange={(e)=>setAutoPlay(e.target.checked)} disabled={disabled} />
+            <span className="text-gray-300 text-sm">Auto-play at due time</span>
+          </label>
         </div>
         <div className="flex gap-2">
           <button
             type="submit"
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold"
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-semibold"
+            disabled={disabled}
           >
             Add Inject
           </button>
           <button
             type="button"
             onClick={onImportClick}
-            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors flex items-center justify-center"
+            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded transition-colors flex items-center justify-center"
             title="Import from CSV/Excel"
             aria-label="Import injects from CSV or Excel"
+            disabled={disabled}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -224,13 +293,15 @@ AddInjectForm.displayName = 'AddInjectForm'
 const AddResourceForm = React.memo<{
   onAddResource: (label: string, minutes: number, kind: ResourceKind) => void
   onImportClick: () => void
-}>(({ onAddResource, onImportClick }) => {
+  disabled?: boolean
+}>(({ onAddResource, onImportClick, disabled = false }) => {
   const [label, setLabel] = useState('')
   const [etaMinutes, setEtaMinutes] = useState('')
   const [kind, setKind] = useState<ResourceKind>('vehicle')
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
+    if (disabled) return
     const minutes = parseInt(etaMinutes, 10)
     if (label.trim() && !isNaN(minutes) && minutes >= 0) {
       onAddResource(label, minutes, kind)
@@ -254,6 +325,7 @@ const AddResourceForm = React.memo<{
           onChange={(e) => setLabel(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           required
+          disabled={disabled}
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <select
@@ -261,6 +333,7 @@ const AddResourceForm = React.memo<{
             onChange={(e) => setKind(e.target.value as ResourceKind)}
             className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
             aria-label="Resource kind"
+            disabled={disabled}
           >
             <option value="person">Person/Position</option>
             <option value="vehicle">Vehicle/Unit</option>
@@ -277,21 +350,24 @@ const AddResourceForm = React.memo<{
           className="w-full px-3 py-2 bg-gray-700 text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
           min="0"
           required
+          disabled={disabled}
         />
         </div>
         <div className="flex gap-2">
           <button
             type="submit"
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
+            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded font-semibold"
+            disabled={disabled}
           >
             Add Resource
           </button>
           <button
             type="button"
             onClick={onImportClick}
-            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors flex items-center justify-center"
+            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded transition-colors flex items-center justify-center"
             title="Import from CSV/Excel"
             aria-label="Import resources from CSV or Excel"
+            disabled={disabled}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -305,10 +381,33 @@ const AddResourceForm = React.memo<{
 AddResourceForm.displayName = 'AddResourceForm'
 
 export default function Dashboard() {
-  // Exercise info
-  const [exerciseName, setExerciseName] = useState("Untitled Exercise")
-  const [controllerName, setControllerName] = useState("")
-  const [exerciseFinishTime, setExerciseFinishTime] = useState("")
+  // Exercise info (initialize from localStorage if present)
+  const initialSnapshot = (() => {
+    if (typeof window === 'undefined') return null as any
+    try {
+      const raw = localStorage.getItem('excon-dashboard-state-v1')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })()
+  const [exerciseName, setExerciseName] = useState<string>(() =>
+    initialSnapshot && typeof initialSnapshot.exerciseName === 'string' ? initialSnapshot.exerciseName : ''
+  )
+  const [controllerName, setControllerName] = useState<string>(() =>
+    initialSnapshot && typeof initialSnapshot.controllerName === 'string' ? initialSnapshot.controllerName : ''
+  )
+  const [exerciseFinishTime, setExerciseFinishTime] = useState<string>(() =>
+    initialSnapshot && typeof initialSnapshot.exerciseFinishTime === 'string' ? initialSnapshot.exerciseFinishTime : ''
+  )
+  // Roles + edit lock (local-only). Admin always editable; operators obey edit lock; viewers are read-only.
+  const [role, setRole] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'admin'
+    return localStorage.getItem('excon-role') || 'admin'
+  })
+  const [editLock, setEditLock] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return (localStorage.getItem('excon-edit-lock') || 'false') === 'true'
+  })
+  const canEdit = role === 'admin' || (role === 'operator' && !editLock)
   
   // Stable callback functions for ExerciseHeader
   const handleExerciseNameChange = useCallback((value: string) => {
@@ -324,8 +423,8 @@ export default function Dashboard() {
   }, [])
   
   // Stable callback functions for forms
-  const handleAddInjectCallback = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string) => {
-    handleAddInject(title, dueTime, type, to, from)
+  const handleAddInjectCallback = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string, audioDataUrl?: string | null, audioName?: string | null, autoPlayAudio?: boolean) => {
+    handleAddInject(title, dueTime, type, to, from, audioDataUrl || undefined, audioName || undefined,  !!autoPlayAudio) 
   }, [])
   
   const handleAddResourceCallback = useCallback((label: string, minutes: number, kind: ResourceKind) => {
@@ -333,18 +432,38 @@ export default function Dashboard() {
   }, [])
   
   const handleImportClickCallback = useCallback(() => {
+    if (!canEdit) return
     setShowImportModal(true)
-  }, [])
+  }, [canEdit])
   
   const handleResourceImportClickCallback = useCallback(() => {
+    if (!canEdit) return
     setShowResourceImportModal(true)
-  }, [])
+  }, [canEdit])
   
   // Timer and main state
-  const [currentSeconds, setCurrentSeconds] = useState(0)
+  const [currentSeconds, setCurrentSeconds] = useState<number>(() =>
+    initialSnapshot && typeof initialSnapshot.currentSeconds === 'number' ? initialSnapshot.currentSeconds : 0
+  )
   const [isRunning, setIsRunning] = useState(false)
-  const [injects, setInjects] = useState<InjectItem[]>(initialInjects)
-  const [resources, setResources] = useState<ResourceItem[]>([])
+  const [injects, setInjects] = useState<InjectItem[]>(() =>
+    initialSnapshot && Array.isArray(initialSnapshot.injects) ? (initialSnapshot.injects as InjectItem[]) : initialInjects
+  )
+  const [resources, setResources] = useState<ResourceItem[]>(() =>
+    initialSnapshot && Array.isArray(initialSnapshot.resources) ? (initialSnapshot.resources as ResourceItem[]) : []
+  )
+  const [audioEnabled, setAudioEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const raw = localStorage.getItem('excon-audio-enabled')
+    return raw ? raw === 'true' : true
+  })
+  const alertedDueRef = useRef<Set<string>>(new Set())
+  const alertedMissedRef = useRef<Set<string>>(new Set())
+  const prevInjectsRef = useRef<InjectItem[] | null>(null)
+  const externalUpdateRef = useRef(false)
+  const scenarioFileInputRef = useRef<HTMLInputElement | null>(null)
+  const [toast, setToast] = useState<{message: string; ts: number} | null>(null)
+  const toastTimeoutRef = useRef<number | null>(null)
   
   // Shared focus-visible ring style for accessibility
   const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
@@ -377,10 +496,63 @@ export default function Dashboard() {
         resources,
       }
       if (typeof window !== 'undefined') {
+        if (externalUpdateRef.current) {
+          // Skip publish for externally-driven updates to avoid loops
+          externalUpdateRef.current = false
+        } else {
+          publishState(state)
+        }
         localStorage.setItem('excon-dashboard-state-v1', JSON.stringify(state))
       }
     } catch {}
   }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, injects, resources])
+
+  // Subscribe to external state updates (e.g., Admin page changes)
+  useEffect(() => {
+    const unsub = subscribeState((s) => {
+      externalUpdateRef.current = true
+      const detailsChanged = (typeof s.exerciseName === 'string' && s.exerciseName !== exerciseName)
+        || (typeof s.controllerName === 'string' && s.controllerName !== controllerName)
+        || (typeof s.exerciseFinishTime === 'string' && s.exerciseFinishTime !== exerciseFinishTime)
+      const injectsChanged = Array.isArray(s.injects) && JSON.stringify(s.injects) !== JSON.stringify(injects)
+      const resourcesChanged = Array.isArray(s.resources) && JSON.stringify(s.resources) !== JSON.stringify(resources)
+      if (typeof s.exerciseName === 'string') setExerciseName(s.exerciseName)
+      if (typeof s.controllerName === 'string') setControllerName(s.controllerName)
+      if (typeof s.exerciseFinishTime === 'string') setExerciseFinishTime(s.exerciseFinishTime)
+      if (typeof s.currentSeconds === 'number') setCurrentSeconds(s.currentSeconds)
+      if (Array.isArray(s.injects)) setInjects(s.injects as InjectItem[])
+      if (Array.isArray(s.resources)) setResources(s.resources as ResourceItem[])
+
+      // Show a small toast when changes arrive from Admin
+      const showToast = (message: string) => {
+        setToast({ message, ts: Date.now() })
+        if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current)
+        toastTimeoutRef.current = window.setTimeout(() => setToast(null), 3000)
+      }
+      if (detailsChanged) showToast('Exercise details updated')
+      else if (injectsChanged || resourcesChanged) showToast('Scenario updated')
+    })
+    return () => unsub()
+  }, [])
+
+  // Listen for role/lock changes via storage (e.g., Admin page)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "excon-role") setRole(localStorage.getItem("excon-role") || "admin")
+      if (e.key === "excon-edit-lock") setEditLock((localStorage.getItem("excon-edit-lock") || "false") === "true")
+    }
+    if (typeof window !== "undefined") window.addEventListener("storage", onStorage)
+    return () => { if (typeof window !== "undefined") window.removeEventListener("storage", onStorage) }
+  }, [])
+
+
+  
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('excon-audio-enabled', String(audioEnabled))
+    }
+  }, [audioEnabled])
   
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false)
@@ -389,6 +561,7 @@ export default function Dashboard() {
   const [previewInjects, setPreviewInjects] = useState<InjectItem[]>([])
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [invalidInjectRows, setInvalidInjectRows] = useState<{rowNum:number, title:string, dueTime:string, type:string, to:string, from:string, error:string}[]>([])
 
   // Resource import modal state
   const [showResourceImportModal, setShowResourceImportModal] = useState(false)
@@ -397,6 +570,38 @@ export default function Dashboard() {
   const [previewResources, setPreviewResources] = useState<ResourceItem[]>([])
   const [resourceValidationErrors, setResourceValidationErrors] = useState<string[]>([])
   const [isResourceProcessing, setIsResourceProcessing] = useState(false)
+  const [invalidResourceRows, setInvalidResourceRows] = useState<{rowNum:number, label:string, eta:string, status?:string, kind?:string, error:string}[]>([])
+  const [autoAdvanceResources, setAutoAdvanceResources] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    const raw = localStorage.getItem('excon-auto-advance-resources')
+    return raw ? raw === 'true' : false
+  })
+
+  // Snooze modal state
+  const [snoozeInjectId, setSnoozeInjectId] = useState<string | null>(null)
+  const [snoozeInput, setSnoozeInput] = useState<string>('')
+
+  // Persist auto-advance toggle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('excon-auto-advance-resources', String(autoAdvanceResources))
+    }
+  }, [autoAdvanceResources])
+
+  // Auto-advance resources when enabled
+  useEffect(() => {
+    if (!autoAdvanceResources) return
+    setResources(prev => prev.map(r => {
+      const created = r.createdAtSeconds ?? 0
+      if (r.status === 'requested' && currentSeconds - created >= 60) {
+        return { ...r, status: 'tasked' as const }
+      }
+      if (r.status === 'tasked' && currentSeconds >= (r.etaSeconds - 60)) {
+        return { ...r, status: 'enroute' as const }
+      }
+      return r
+    }))
+  }, [currentSeconds, autoAdvanceResources])
 
   // Inline editing state
   const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
@@ -443,13 +648,82 @@ export default function Dashboard() {
     )
   }, [currentSeconds])
 
+  // Detect newly due and newly missed injects for audio cues
+  useEffect(() => {
+    if (!audioEnabled) return
+    // Single beep when an inject becomes due (once)
+    injects.forEach(inject => {
+      if (inject.status === 'pending' && currentSeconds >= inject.dueSeconds && !alertedDueRef.current.has(inject.id)) {
+        alertedDueRef.current.add(inject.id)
+        if (!inject.acked) {
+          if (inject.audioDataUrl && inject.autoPlayAudio) {
+            try {
+              const audio = new Audio(inject.audioDataUrl)
+              void audio.play()
+            } catch { /* ignore */ }
+          } else {
+            playBeep(1)
+          }
+        }
+      }
+    })
+  }, [currentSeconds, injects, audioEnabled])
+
+  useEffect(() => {
+    if (!audioEnabled) {
+      prevInjectsRef.current = injects
+      return
+    }
+    const prev = prevInjectsRef.current
+    if (prev) {
+      const prevStatus = new Map(prev.map(i => [i.id, i.status]))
+      injects.forEach(i => {
+        const was = prevStatus.get(i.id)
+        if (i.status === 'missed' && was !== 'missed' && !alertedMissedRef.current.has(i.id)) {
+          alertedMissedRef.current.add(i.id)
+          playBeep(2)
+        }
+      })
+    }
+    prevInjectsRef.current = injects
+  }, [injects, audioEnabled])
+
+  const playBeep = (times: number) => {
+    try {
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const duration = 0.12
+      const gap = 0.12
+      for (let n = 0; n < times; n++) {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = times === 2 ? 880 : 660
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        const start = ctx.currentTime + n * (duration + gap)
+        const end = start + duration
+        gain.gain.setValueAtTime(0.0001, start)
+        gain.gain.exponentialRampToValueAtTime(0.2, start + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.0001, end)
+        osc.start(start)
+        osc.stop(end)
+      }
+      // close after a short delay to free resources
+      setTimeout(() => ctx.close(), (duration + gap) * times * 1000 + 200)
+    } catch {}
+  }
+
   useEffect(() => {
     setResources(prevResources => 
-      prevResources.map(resource => 
-        resource.status === "enroute" && currentSeconds >= resource.etaSeconds
-          ? { ...resource, status: "arrived" as const }
-          : resource
-      )
+      prevResources.map(resource => {
+        // Auto-advance enroute -> arrived at ETA
+        if (resource.status === "enroute" && currentSeconds >= resource.etaSeconds) {
+          return { ...resource, status: "arrived" as const }
+        }
+        return resource
+      })
     )
   }, [currentSeconds])
 
@@ -648,6 +922,26 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     )
   }
 
+  const handleAckInject = (injectId: string, ack: boolean) => {
+    setInjects(prev => prev.map(i => i.id === injectId ? { ...i, acked: ack } : i))
+  }
+
+  const handleSnoozeInject = (injectId: string, minutes: number) => {
+    const offset = Math.max(0, Math.round(minutes * 60))
+    setInjects(prev => renumberInjects(prev.map(i => i.id === injectId ? { ...i, dueSeconds: currentSeconds + offset, acked: false } : i)))
+    alertedDueRef.current.delete(injectId)
+  }
+
+  const handlePlayInjectAudio = (injectId: string) => {
+    const inject = injects.find(i => i.id === injectId)
+    if (inject?.audioDataUrl) {
+      try {
+        const audio = new Audio(inject.audioDataUrl)
+        void audio.play()
+      } catch {}
+    }
+  }
+
   // Resource handlers
   const handleResourceStatusChange = (resourceId: string, newStatus: ResourceStatus) => {
     setResources(prevResources => 
@@ -660,11 +954,21 @@ const getInjectTypeTextColor = (type: InjectType): string => {
   }
 
   const handleResourceETAEdit = (resourceId: string, newETATime: string) => {
-    const newETASeconds = parseHMS(newETATime)
+    let newETASeconds: number | null = null
+    const val = newETATime.trim()
+    if (/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(val)) {
+      newETASeconds = parseHMS(val)
+    } else {
+      const num = Number(val)
+      if (!isNaN(num) && num >= 0) {
+        // treat numeric as minutes from now
+        newETASeconds = currentSeconds + Math.round(num * 60)
+      }
+    }
     if (newETASeconds !== null) {
-      setResources(prevResources => 
-        prevResources.map(resource => 
-          resource.id === resourceId 
+      setResources(prevResources =>
+        prevResources.map(resource =>
+          resource.id === resourceId
             ? { ...resource, etaSeconds: newETASeconds }
             : resource
         )
@@ -683,7 +987,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       .map((inject, index) => ({ ...inject, number: index + 1 }))
   }, [])
 
-  const handleAddInject = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string) => {
+  const handleAddInject = useCallback((title: string, dueTime: string, type: InjectType, to: string, from: string, audioDataUrl?: string, audioName?: string, autoPlayAudio?: boolean) => {
     const dueSeconds = parseHMS(dueTime)
     if (dueSeconds !== null && title.trim() && to.trim() && from.trim()) {
       const newInject: InjectItem = {
@@ -694,7 +998,11 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         type,
         status: "pending",
         to: to.trim(),
-        from: from.trim()
+        from: from.trim(),
+        acked: false,
+        audioDataUrl,
+        audioName,
+        autoPlayAudio: !!autoPlayAudio
       }
       setInjects(prev => renumberInjects([...prev, newInject]))
     }
@@ -742,6 +1050,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
 
   // Inline editing functions
   const handleStartEdit = (id: string, field: string, currentValue: string | number) => {
+    if (!canEdit) return
     setEditingField({ id, field })
     setEditingValue(String(currentValue))
   }
@@ -813,7 +1122,8 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         label: label.trim(),
         etaSeconds: currentSeconds + (etaMinutes * 60),
         status: "requested",
-        kind
+        kind,
+        createdAtSeconds: currentSeconds
       }
       setResources(prev => [...prev, newResource])
     }
@@ -824,6 +1134,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     setImportFile(file)
     setIsProcessing(true)
     setValidationErrors([])
+    setInvalidInjectRows([])
     
     try {
       const arrayBuffer = await file.arrayBuffer()
@@ -848,7 +1159,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         h.includes('title') || h.includes('name') || h.includes('description')
       )
       const dueTimeIdx = normalizedHeaders.findIndex(h => 
-        h.includes('duetime') || h.includes('time') || h.includes('due')
+        h.includes('duetime') || h.includes('time') || h.includes('due') || h.includes('second') || h.includes('sec')
       )
       const typeIdx = normalizedHeaders.findIndex(h => 
         h.includes('type') || h.includes('category')
@@ -868,7 +1179,9 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       
       // Process rows and validate
       const errors: string[] = []
+      const invalidRows: {rowNum:number, title:string, dueTime:string, type:string, to:string, from:string, error:string}[] = []
       const validInjects = [] as InjectItem[]
+      const dueHeaderNorm = normalizedHeaders[dueTimeIdx]
       
       (dataRows as unknown[][]).forEach((row: unknown[], rowIndex) => {
         const rowNum = rowIndex + 2 // +2 because we start from row 1 and skip header
@@ -881,14 +1194,31 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         
         // Validate title
         if (!title) {
-          errors.push(`Row ${rowNum}: Title is required`)
+          const msg = `Row ${rowNum}: Title is required`
+          errors.push(msg)
+          invalidRows.push({ rowNum, title, dueTime: dueTimeStr, type: typeStr, to: toStr, from: fromStr, error: msg })
           return
         }
         
-        // Validate and parse due time
-        const dueSeconds = parseHMS(dueTimeStr)
+        // Validate and parse due time (supports HH:MM:SS, seconds absolute, or minutes relative)
+        let dueSeconds: number | null = null
+        if (/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(dueTimeStr)) {
+          dueSeconds = parseHMS(dueTimeStr)
+        } else {
+          const num = Number(dueTimeStr)
+          if (!isNaN(num) && num >= 0) {
+            if (dueHeaderNorm?.includes('second') || dueHeaderNorm?.includes('sec')) {
+              dueSeconds = Math.floor(num)
+            } else {
+              // minutes
+              dueSeconds = currentSeconds + Math.round(num * 60)
+            }
+          }
+        }
         if (dueSeconds === null) {
-          errors.push(`Row ${rowNum}: Invalid time format "${dueTimeStr}". Use HH:MM:SS format.`)
+          const msg = `Row ${rowNum}: Invalid time "${dueTimeStr}". Use minutes (e.g., 15), HH:MM:SS (e.g., 01:30:00), or seconds.`
+          errors.push(msg)
+          invalidRows.push({ rowNum, title, dueTime: dueTimeStr, type: typeStr, to: toStr, from: fromStr, error: msg })
           return
         }
         
@@ -909,12 +1239,113 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       
       setPreviewInjects(validInjects)
       setValidationErrors(errors)
+      setInvalidInjectRows(invalidRows)
       
     } catch {
       setValidationErrors(['Error reading file. Please ensure it is a valid CSV or Excel file.'])
     }
     
     setIsProcessing(false)
+  }
+
+  // Scenario templates (JSON)
+  const saveScenarioJSON = () => {
+    try {
+      const scenario = {
+        version: 'excon-scenario-v1',
+        exerciseName,
+        controllerName,
+        exerciseFinishTime,
+        injects: [...injects]
+          .sort((a,b) => a.dueSeconds - b.dueSeconds)
+          .map(i => ({ title: i.title, dueSeconds: i.dueSeconds, type: i.type, to: i.to, from: i.from })),
+        resources: [...resources]
+          .sort((a,b) => a.etaSeconds - b.etaSeconds)
+          .map(r => ({ label: r.label, etaSeconds: r.etaSeconds, status: r.status, kind: r.kind }))
+      }
+      const blob = new Blob([JSON.stringify(scenario, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const name = exerciseName?.trim() ? `_${exerciseName.trim().replace(/\s+/g,'_')}` : ''
+      a.href = url
+      a.download = `scenario${name}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {}
+  }
+
+  const handleScenarioLoad = async (file: File) => {
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data || typeof data !== 'object' || data.version !== 'excon-scenario-v1') return
+      // Basic shape checks
+      const loadedInjects: InjectItem[] = Array.isArray(data.injects) ? data.injects.map((i: any, idx: number) => ({
+        id: generateId(),
+        number: idx + 1,
+        title: String(i.title || ''),
+        dueSeconds: Number(i.dueSeconds || 0),
+        type: mapInjectType(String(i.type || 'other')),
+        status: 'pending',
+        to: String(i.to || ''),
+        from: String(i.from || '')
+      })) : []
+
+      const loadedResources: ResourceItem[] = Array.isArray(data.resources) ? data.resources.map((r: any) => ({
+        id: generateId(),
+        label: String(r.label || ''),
+        etaSeconds: Number(r.etaSeconds || 0),
+        status: (['requested','tasked','enroute','arrived','cancelled'].includes(String(r.status))) ? r.status as ResourceStatus : 'requested',
+        kind: (['person','vehicle','group','air','capability','supply'].includes(String(r.kind))) ? r.kind as any : undefined,
+      })) : []
+
+      setInjects(renumberInjects(loadedInjects))
+      setResources(loadedResources)
+      if (typeof data.exerciseName === 'string') setExerciseName(data.exerciseName)
+      if (typeof data.controllerName === 'string') setControllerName(data.controllerName)
+      if (typeof data.exerciseFinishTime === 'string') setExerciseFinishTime(data.exerciseFinishTime)
+    } catch {}
+  }
+
+  // CSV export helpers and actions
+  const csvEscape = (value: unknown) => {
+    const s = String(value ?? '')
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
+  const downloadCSV = (filename: string, rows: (string|number)[][]) => {
+    try {
+      const content = rows.map(r => r.map(csvEscape).join(',')).join('\r\n')
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {}
+  }
+  const exportInjectsImportCSV = () => {
+    const rows: (string|number)[][] = []
+    rows.push(['Title','Due (minutes)','Type','To','From'])
+    const sorted = [...injects].sort((a,b) => a.dueSeconds - b.dueSeconds)
+    sorted.forEach(i => {
+      const minutes = Math.max(0, Math.round((i.dueSeconds - currentSeconds) / 60))
+      rows.push([i.title, minutes, i.type, i.to, i.from])
+    })
+    const name = exerciseName?.trim() ? `_${exerciseName.trim().replace(/\s+/g,'_')}` : ''
+    downloadCSV(`injects_import${name}.csv`, rows)
+  }
+  const exportResourcesCSV = () => {
+    const rows: (string|number)[][] = []
+    rows.push(['Label','Status','Kind','ETASeconds','ETA(HH:MM:SS)'])
+    const sorted = [...resources].sort((a,b) => a.etaSeconds - b.etaSeconds)
+    sorted.forEach(r => rows.push([r.label, r.status, r.kind || '', r.etaSeconds, formatHMS(r.etaSeconds)]))
+    const name = exerciseName?.trim() ? `_${exerciseName.trim().replace(/\s+/g,'_')}` : ''
+    downloadCSV(`resources${name}.csv`, rows)
   }
 
   const handleImport = () => {
@@ -941,16 +1372,17 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     setImportFile(null)
     setPreviewInjects([])
     setValidationErrors([])
+    setInvalidInjectRows([])
     setImportMode('append')
   }
 
   const downloadTemplate = () => {
     const templateData = [
-      ['Title', 'DueTime', 'Type', 'To', 'From'],
-      ['Fire reported at Location A', '00:10:00', 'radio/phone', 'Fire Chief', 'Control'],
-      ['Evacuation request from Site B', '00:25:00', 'in person', 'Site Manager', 'Emergency Team'],
-      ['Media inquiry about incident', '00:40:00', 'electronic', 'Media Liaison', 'Dispatch'],
-      ['Update incident map display', '00:50:00', 'map inject', 'GIS Coordinator', 'Operations']
+      ['Title', 'Due (minutes)', 'Type', 'To', 'From'],
+      ['Fire reported at Location A', '10', 'radio/phone', 'Fire Chief', 'Control'],
+      ['Evacuation request from Site B', '25', 'in person', 'Site Manager', 'Emergency Team'],
+      ['Media inquiry about incident', '40', 'electronic', 'Media Liaison', 'Dispatch'],
+      ['Update incident map display', '50', 'map inject', 'GIS Coordinator', 'Operations']
     ]
     
     const worksheet = XLSX.utils.aoa_to_sheet(templateData)
@@ -964,6 +1396,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     setResourceImportFile(file)
     setIsResourceProcessing(true)
     setResourceValidationErrors([])
+    setInvalidResourceRows([])
     
     try {
       const arrayBuffer = await file.arrayBuffer()
@@ -988,10 +1421,13 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         h.includes('label') || h.includes('name') || h.includes('resource')
       )
       const etaIdx = normalizedHeaders.findIndex(h => 
-        h.includes('eta') || h.includes('minutes') || h.includes('time')
+        h.includes('eta') || h.includes('minutes') || h.includes('time') || h.includes('second') || h.includes('sec')
       )
       const statusIdx = normalizedHeaders.findIndex(h => 
         h.includes('status')
+      )
+      const kindIdx = normalizedHeaders.findIndex(h => 
+        h.includes('kind') || h.includes('type') || h.includes('category')
       )
       
       if (labelIdx === -1 || etaIdx === -1) {
@@ -1002,6 +1438,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       
       // Process rows and validate
       const errors: string[] = []
+      const invalidRows: {rowNum:number, label:string, eta:string, status?:string, kind?:string, error:string}[] = []
       const validResources = [] as ResourceItem[]
       
       (dataRows as unknown[][]).forEach((row: unknown[], rowIndex) => {
@@ -1010,17 +1447,37 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         const label = String(row[labelIdx] || '').trim()
         const etaStr = String(row[etaIdx] || '').trim()
         const statusStr = String(row[statusIdx] || 'requested').trim().toLowerCase()
+        const kindStr = kindIdx !== -1 ? String(row[kindIdx] || '').trim() : ''
         
         // Validate label
         if (!label) {
-          errors.push(`Row ${rowNum}: Label is required`)
+          const msg = `Row ${rowNum}: Label is required`
+          errors.push(msg)
+          invalidRows.push({ rowNum, label, eta: etaStr, status: statusStr, error: msg })
           return
         }
         
-        // Validate and parse ETA
-        const etaMinutes = parseInt(etaStr, 10)
-        if (isNaN(etaMinutes) || etaMinutes < 0) {
-          errors.push(`Row ${rowNum}: Invalid ETA "${etaStr}". Must be a positive number of minutes.`)
+        // Validate and parse ETA (supports minutes, HH:MM:SS absolute, or seconds)
+        let etaSecondsAbs: number | null = null
+        if (/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(etaStr)) {
+          // Absolute HH:MM:SS from T0
+          etaSecondsAbs = parseHMS(etaStr)
+        } else {
+          const etaHeader = normalizedHeaders[etaIdx] || ''
+          const num = Number(etaStr)
+          if (!isNaN(num) && num >= 0) {
+            if (etaHeader.includes('second') || etaHeader.includes('sec')) {
+              etaSecondsAbs = Math.floor(num)
+            } else {
+              // minutes (relative from current time)
+              etaSecondsAbs = currentSeconds + Math.round(num * 60)
+            }
+          }
+        }
+        if (etaSecondsAbs === null) {
+          const msg = `Row ${rowNum}: Invalid ETA "${etaStr}". Use minutes (e.g., 15), HH:MM:SS (e.g., 01:30:00), or seconds.`
+          errors.push(msg)
+          invalidRows.push({ rowNum, label, eta: etaStr, status: statusStr, error: msg })
           return
         }
         
@@ -1029,26 +1486,34 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         if (['requested', 'tasked', 'enroute', 'arrived', 'cancelled'].includes(statusStr)) {
           status = statusStr as ResourceStatus
         }
-        // Infer kind from label (simple heuristics)
-        const lower = label.toLowerCase()
-        let kind: ResourceKind = 'vehicle'
-        if (/(officer|chief|president|planner|liaison)/.test(lower)) kind = 'person'
-        else if (/(task\s*force|strike\s*team|group)/.test(lower)) kind = 'group'
-        else if (/(heli|air|plane|chopper)/.test(lower)) kind = 'air'
-        else if (/(drone|uav|robot|capability)/.test(lower)) kind = 'capability'
-        else if (/(food|catering|water|suppl|meals|rations|feed)/.test(lower)) kind = 'supply'
+        // Kind: explicit column, otherwise infer from label (simple heuristics)
+        let kind: ResourceKind | undefined
+        const kNorm = kindStr.toLowerCase()
+        if (['person','vehicle','group','air','capability','supply'].includes(kNorm)) {
+          kind = kNorm as ResourceKind
+        } else {
+          const lower = label.toLowerCase()
+          if (/(officer|chief|president|planner|liaison)/.test(lower)) kind = 'person'
+          else if (/(task\s*force|strike\s*team|group)/.test(lower)) kind = 'group'
+          else if (/(heli|air|plane|chopper)/.test(lower)) kind = 'air'
+          else if (/(drone|uav|robot|capability)/.test(lower)) kind = 'capability'
+          else if (/(food|catering|water|suppl|meals|rations|feed)/.test(lower)) kind = 'supply'
+          else kind = 'vehicle'
+        }
         
         validResources.push({
           id: generateId(),
           label,
-          etaSeconds: currentSeconds + (etaMinutes * 60),
+          etaSeconds: etaSecondsAbs,
           status,
-          kind
+          kind,
+          createdAtSeconds: currentSeconds
         })
       })
       
       setPreviewResources(validResources)
       setResourceValidationErrors(errors)
+      setInvalidResourceRows(invalidRows)
       
     } catch {
       setResourceValidationErrors(['Error reading file. Please ensure it is a valid CSV or Excel file.'])
@@ -1081,16 +1546,17 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     setResourceImportFile(null)
     setPreviewResources([])
     setResourceValidationErrors([])
+    setInvalidResourceRows([])
     setResourceImportMode('append')
   }
 
   const downloadResourceTemplate = () => {
     const templateData = [
-      ['Label', 'ETA (minutes)', 'Status'],
-      ['Fire Engine 1', '15', 'requested'],
-      ['Ambulance 2', '20', 'requested'],
-      ['Police Unit 3', '10', 'requested'],
-      ['Hazmat Team', '45', 'requested']
+      ['Label', 'Kind (optional)', 'ETA (minutes)', 'Status'],
+      ['Fire Engine 1', 'vehicle', '15', 'requested'],
+      ['Ambulance 2', 'vehicle', '20', 'requested'],
+      ['Police Unit 3', 'vehicle', '10', 'requested'],
+      ['Hazmat Team', 'group', '45', 'requested']
     ]
     
     const worksheet = XLSX.utils.aoa_to_sheet(templateData)
@@ -1114,12 +1580,21 @@ const getInjectTypeTextColor = (type: InjectType): string => {
 
     return (
       <div className="bg-gray-800 rounded-lg p-6">
+        <div className="flex items-start justify-end mb-2">
+          <button
+            onClick={() => { if (typeof window !== 'undefined') window.open('/display/timer', 'TimerDisplay', 'noopener,noreferrer,width=900,height=700'); }}
+            className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
+            title="Open Timer Display"
+            aria-label="Open Timer Display"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
         <div className="text-center mb-6">
           <div className="text-6xl lg:text-8xl font-mono font-bold text-white mb-4 tracking-wider">
             {formatHMS(currentSeconds)}
           </div>
-          
-          <div className="flex gap-4 justify-center mb-6">
+          <div className="flex gap-4 justify-center mb-4">
             <button
               onClick={handleStartStop}
               className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
@@ -1134,7 +1609,6 @@ const getInjectTypeTextColor = (type: InjectType): string => {
               Reset
             </button>
           </div>
-
           <form onSubmit={handleManualSubmit} className="flex gap-2 justify-center">
             <input
               type="text"
@@ -1205,11 +1679,24 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       )
     }
     
+    const onKey = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        handleStartEdit(inject.id, field, value)
+      }
+    }
+    const fieldLabel: Record<string, string> = {
+      number: 'number', dueTime: 'due time', title: 'title', type: 'type', to: 'to', from: 'from'
+    }
     return (
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => handleStartEdit(inject.id, field, value)}
-        className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 px-2 py-1 rounded transition-colors"
+        onKeyDown={onKey}
+        className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 px-2 py-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
         title="Click to edit"
+        aria-label={`Edit ${fieldLabel[field] || field} for inject #${inject.number}`}
       >
         {displayValue || value}
       </div>
@@ -1219,9 +1706,30 @@ const getInjectTypeTextColor = (type: InjectType): string => {
   const InjectList = () => {
     return (
       <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-2xl font-bold text-white mb-4">Inject Status</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-2xl font-bold text-white">Inject Status</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportInjectsImportCSV}
+              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
+              title="Export Injects (Import CSV)"
+              aria-label="Export Injects (Import CSV)"
+            >
+              <FileDown className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setAudioEnabled(v => !v)}
+              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
+              title={audioEnabled ? 'Mute alerts' : 'Unmute alerts'}
+              aria-pressed={audioEnabled}
+              aria-label={audioEnabled ? 'Mute audio alerts' : 'Unmute audio alerts'}
+            >
+              {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label="Injects table">
             <thead className="bg-gray-700">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">#</th>
@@ -1317,10 +1825,58 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
+                      {/* Ack */}
+                      <button
+                        onClick={() => handleAckInject(inject.id, !(inject.acked ?? false))}
+                        className={`px-2 py-1 text-xs ${inject.acked ? 'bg-gray-600' : 'bg-teal-600 hover:bg-teal-700'} text-white rounded ${focusRing}`}
+                        disabled={!canEdit}
+                        title={inject.acked ? 'Unacknowledge' : 'Acknowledge'}
+                        aria-label={inject.acked ? `Unacknowledge inject #${inject.number}` : `Acknowledge inject #${inject.number}`}
+                      >
+                        {inject.acked ? 'Unack' : 'Ack'}
+                      </button>
+                      {/* Snooze */}
+                      <button
+                        onClick={() => setSnoozeInjectId(inject.id)}
+                        className={`px-2 py-1 text-xs bg-purple-700 hover:bg-purple-600 text-white rounded ${focusRing}`}
+                        title="Snooze (custom)"
+                        aria-label={`Snooze inject #${inject.number}`}
+                        disabled={!canEdit}
+                      >
+                        Snooze
+                      </button>
+                      <button
+                        onClick={() => handleSnoozeInject(inject.id, 5)}
+                        className={`px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded ${focusRing}`}
+                        title="Snooze +5m"
+                        aria-label={`Snooze inject #${inject.number} by 5 minutes`}
+                        disabled={!canEdit}
+                      >
+                        +5m
+                      </button>
+                      <button
+                        onClick={() => handleSnoozeInject(inject.id, 10)}
+                        className={`px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded ${focusRing}`}
+                        title="Snooze +10m"
+                        aria-label={`Snooze inject #${inject.number} by 10 minutes`}
+                        disabled={!canEdit}
+                      >
+                        +10m
+                      </button>
+                      {inject.audioDataUrl && (
+                        <button
+                          onClick={() => handlePlayInjectAudio(inject.id)}
+                          className={`px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded ${focusRing}`}
+                          title="Play attached audio"
+                          aria-label={`Play audio for inject #${inject.number}`}
+                        >
+                          Play
+                        </button>
+                      )}
                       {/* Move Up/Down */}
                       <button
                         onClick={() => handleMoveInject(inject.id, 'up')}
-                        disabled={sortedIndex === 0}
+                        disabled={!canEdit || sortedIndex === 0}
                         className={`px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded ${focusRing}`}
                         title="Move up"
                         aria-label={`Move inject #${inject.number} up`}
@@ -1329,7 +1885,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       </button>
                       <button
                         onClick={() => handleMoveInject(inject.id, 'down')}
-                        disabled={sortedIndex === injects.length - 1}
+                        disabled={!canEdit || sortedIndex === injects.length - 1}
                         className={`px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded ${focusRing}`}
                         title="Move down"
                         aria-label={`Move inject #${inject.number} down`}
@@ -1340,7 +1896,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       {/* Complete/Incomplete */}
                       <button
                         onClick={() => handleToggleInjectStatus(inject.id)}
-                        disabled={inject.status === 'skipped'}
+                        disabled={!canEdit || inject.status === 'skipped'}
                         className={`px-2 py-1 text-xs font-semibold rounded transition-colors disabled:opacity-50 ${focusRing} ${
                           inject.status === 'completed' 
                             ? 'bg-orange-600 hover:bg-orange-700 text-white' 
@@ -1354,7 +1910,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       {/* Skip */}
                       <button
                         onClick={() => handleSkipInject(inject.id)}
-                        disabled={inject.status === 'skipped' || inject.status === 'completed'}
+                        disabled={!canEdit || inject.status === 'skipped' || inject.status === 'completed'}
                         className={`px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded ${focusRing}`}
                         title="Skip inject"
                         aria-label={`Skip inject #${inject.number}`}
@@ -1365,6 +1921,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       <button
                         onClick={() => handleDeleteInject(inject.id)}
                         className={`px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded ${focusRing}`}
+                        disabled={!canEdit}
                         title="Delete inject"
                         aria-label={`Delete inject #${inject.number}`}
                       >
@@ -1403,9 +1960,44 @@ const getInjectTypeTextColor = (type: InjectType): string => {
 
     return (
       <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-2xl font-bold text-white mb-4">Resource Requests</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-2xl font-bold text-white">Resource Requests</h3>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input type="checkbox" checked={autoAdvanceResources} onChange={(e)=>setAutoAdvanceResources(e.target.checked)} />
+              Auto-advance
+            </label>
+            <button
+              onClick={() => {
+                // Import-ready CSV: minutes instead of absolute seconds
+                const rows: (string|number)[][] = []
+                rows.push(['Label','Kind','ETA (minutes)','Status'])
+                const sorted = [...resources].sort((a,b) => a.etaSeconds - b.etaSeconds)
+                sorted.forEach(r => {
+                  const minutes = Math.max(0, Math.round((r.etaSeconds - currentSeconds) / 60))
+                  rows.push([r.label, r.kind || '', minutes, r.status])
+                })
+                const name = exerciseName?.trim() ? `_${exerciseName.trim().replace(/\s+/g,'_')}` : ''
+                downloadCSV(`resources_import${name}.csv`, rows)
+              }}
+              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
+              title="Export Resources (Import CSV)"
+              aria-label="Export Resources (Import CSV)"
+            >
+              <FileDown className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { if (typeof window !== 'undefined') window.open('/display/resources', 'ResourcesDisplay', 'noopener,noreferrer,width=1200,height=800'); }}
+              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
+              title="Open Resources Display"
+              aria-label="Open Resources Display"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label="Resource requests table">
             <thead className="bg-gray-700">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">Label</th>
@@ -1449,9 +2041,9 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       </div>
                     ) : (
                       <span
-                        className="cursor-pointer hover:text-blue-400"
-                        onClick={() => handleStartEdit(resource)}
-                        title="Click to edit ETA"
+                        className={`cursor-pointer ${canEdit ? 'hover:text-blue-400' : 'text-gray-400 cursor-not-allowed'}`}
+                        onClick={() => { if (canEdit) handleStartEdit(resource) }}
+                        title={canEdit ? "Click to edit ETA" : "Editing locked"}
                       >
                         {formatHMS(resource.etaSeconds)}
                       </span>
@@ -1467,7 +2059,8 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       {resource.status === "requested" && (
                         <button
                           onClick={() => handleResourceStatusChange(resource.id, "tasked")}
-                          className="px-2 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded"
+                          className="px-2 py-1 text-xs bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 text-white rounded"
+                          disabled={!canEdit}
                         >
                           Task
                         </button>
@@ -1475,7 +2068,8 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       {resource.status === "tasked" && (
                         <button
                           onClick={() => handleResourceStatusChange(resource.id, "enroute")}
-                          className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                          className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded"
+                          disabled={!canEdit}
                         >
                           Dispatch
                         </button>
@@ -1483,7 +2077,8 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       {resource.status === "enroute" && (
                         <button
                           onClick={() => handleResourceStatusChange(resource.id, "arrived")}
-                          className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
+                          className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded"
+                          disabled={!canEdit}
                         >
                           Arrive
                         </button>
@@ -1491,7 +2086,8 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                       {!isTerminalStatus(resource.status) && (
                         <button
                           onClick={() => handleResourceStatusChange(resource.id, "cancelled")}
-                          className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                          className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded"
+                          disabled={!canEdit}
                         >
                           Cancel
                         </button>
@@ -1541,6 +2137,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         </div>
         <p className="text-white mb-2">Drag and drop a CSV or Excel file here, or click to browse</p>
         <p className="text-gray-400 text-sm mb-4">Accepts .csv, .xlsx, .xls files</p>
+        <p className="text-gray-400 text-xs mb-2">Due can be minutes (e.g., 15), HH:MM:SS from start (e.g., 01:30:00), or seconds (e.g., 5400).</p>
         <input
           type="file"
           accept=".csv,.xlsx,.xls"
@@ -1602,6 +2199,44 @@ const getInjectTypeTextColor = (type: InjectType): string => {
           )}
         </div>
       </div>
+    )
+  }
+
+  const InvalidInjectRowsTable = () => {
+    if (invalidInjectRows.length === 0) return null
+    const rows = invalidInjectRows.slice(0, 50)
+    return (
+      <div className="mt-6">
+        <h4 className="text-lg font-semibold text-red-400 mb-3">Invalid Rows ({invalidInjectRows.length})</h4>
+        <div className="overflow-x-auto max-h-64 border border-red-600 rounded">
+          <table className="w-full text-sm" aria-label="Invalid inject rows">
+            <thead className="bg-red-900 bg-opacity-40 sticky top-0">
+              <tr>
+                <th className="px-3 py-2 text-left text-white">Row</th>
+                <th className="px-3 py-2 text-left text-white">Title</th>
+                <th className="px-3 py-2 text-left text-white">Due Time</th>
+                <th className="px-3 py-2 text-left text-white">Type</th>
+                <th className="px-3 py-2 text-left text-white">To</th>
+                <th className="px-3 py-2 text-left text-white">From</th>
+                <th className="px-3 py-2 text-left text-white">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t border-red-800 bg-red-950 bg-opacity-20">
+                  <td className="px-3 py-2 text-red-300 font-mono">{r.rowNum}</td>
+                  <td className="px-3 py-2 text-red-300">{r.title || '-'}</td>
+                  <td className="px-3 py-2 text-red-300 font-mono">{r.dueTime || '-'}</td>
+                  <td className="px-3 py-2 text-red-300">{r.type || '-'}</td>
+                  <td className="px-3 py-2 text-red-300">{r.to || '-'}</td>
+                  <td className="px-3 py-2 text-red-300">{r.from || '-'}</td>
+                  <td className="px-3 py-2 text-red-200">{r.error}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+      </div>
+    </div>
     )
   }
 
@@ -1683,6 +2318,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                   <div>
                     <ValidationList />
                     <PreviewTable />
+                    <InvalidInjectRowsTable />
                   </div>
                 )}
               </div>
@@ -1792,6 +2428,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
             Choose File
           </label>
           <p className="text-gray-400 text-sm mt-2">Supports .xlsx and .csv files</p>
+          <p className="text-gray-400 text-xs mt-1">ETA can be minutes (e.g., 15), HH:MM:SS from start (e.g., 01:30:00), or seconds (e.g., 5400). Optional Kind: person, vehicle, group, air, capability, supply.</p>
         </div>
       )
     }
@@ -1821,7 +2458,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         <div className="mb-4">
           <h4 className="text-white font-semibold mb-2">Preview ({previewResources.length} resources):</h4>
           <div className="overflow-x-auto">
-            <table className="w-full border border-gray-600 rounded">
+            <table className="w-full border border-gray-600 rounded" aria-label="Preview resources">
               <thead>
                 <tr className="bg-gray-700">
                   <th className="p-2 text-left text-white border-b border-gray-600">Label</th>
@@ -1855,6 +2492,40 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                     </td>
                   </tr>
                 )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )
+    }
+
+    const ResourceInvalidRowsTable = () => {
+      if (invalidResourceRows.length === 0) return null
+      const rows = invalidResourceRows.slice(0, 50)
+      return (
+        <div className="mb-4">
+          <h4 className="text-red-400 font-semibold mb-2">Invalid Rows ({invalidResourceRows.length})</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full border border-red-700 rounded" aria-label="Invalid resource rows">
+              <thead>
+                <tr className="bg-red-900 bg-opacity-40">
+                  <th className="p-2 text-left text-white">Row</th>
+                  <th className="p-2 text-left text-white">Label</th>
+                  <th className="p-2 text-left text-white">ETA</th>
+                  <th className="p-2 text-left text-white">Status</th>
+                  <th className="p-2 text-left text-white">Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b border-red-800 bg-red-950 bg-opacity-20">
+                    <td className="p-2 text-red-300 font-mono">{r.rowNum}</td>
+                    <td className="p-2 text-red-300">{r.label || '-'}</td>
+                    <td className="p-2 text-red-300">{r.eta || '-'}</td>
+                    <td className="p-2 text-red-300 capitalize">{r.status || '-'}</td>
+                    <td className="p-2 text-red-200">{r.error}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1914,6 +2585,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
                   <div>
                     <ResourceValidationList />
                     <ResourcePreviewTable />
+                    <ResourceInvalidRowsTable />
                   </div>
                 )}
               </div>
@@ -2362,14 +3034,12 @@ const getInjectTypeTextColor = (type: InjectType): string => {
           onExerciseNameChange={handleExerciseNameChange}
           onControllerNameChange={handleControllerNameChange}
           onFinishTimeChange={handleFinishTimeChange}
+          readonly
         />
-        
-        {/* Main Section: Timer and Resource Requests */}
+
+        {/* Main Section: Timer and Resource Requests side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Timer Controls */}
           <TimerControls />
-          
-          {/* Resource Request Board */}
           <ResourceRequestBoard />
         </div>
         
@@ -2395,20 +3065,86 @@ const getInjectTypeTextColor = (type: InjectType): string => {
             <AddInjectForm 
               onAddInject={handleAddInjectCallback} 
               onImportClick={handleImportClickCallback}
+              disabled={ !canEdit} 
             />
-            
             {/* Add Resource Form */}
             <AddResourceForm 
               onAddResource={handleAddResourceCallback} 
               onImportClick={handleResourceImportClickCallback}
+              disabled={ !canEdit} 
             />
-          </div>
         </div>
+        </div>
+
         
         {/* Import Modal */}
         <ImportInjectsModal />
         <ImportResourcesModal />
+        {/* Snooze Modal */}
+        {snoozeInjectId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-600 p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xl font-semibold text-white">Snooze Inject</h4>
+                <button onClick={() => { setSnoozeInjectId(null); setSnoozeInput("") }} className="text-gray-400 hover:text-white" aria-label="Close snooze dialog">×</button>
+              </div>
+              <p className="text-gray-300 mb-3">Enter minutes or HH:MM:SS.</p>
+              <input
+                type="text"
+                value={snoozeInput}
+                onChange={(e) => setSnoozeInput(e.target.value)}
+                placeholder="e.g., 5 or 01:30:00"
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded font-mono mb-4"
+              />
+              <div className="flex gap-2 mb-4">
+                {[1,5,10,15].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => { if (snoozeInjectId) { handleSnoozeInject(snoozeInjectId, m); setSnoozeInjectId(null); setSnoozeInput('') } }}
+                    className="px-3 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded"
+                  >
+                    +{m}m
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => { setSnoozeInjectId(null); setSnoozeInput('') }} className="px-4 py-2 text-gray-300 hover:text-white">Cancel</button>
+                <button
+                  onClick={() => {
+                    if (!snoozeInjectId) return
+                    const val = snoozeInput.trim()
+                    if (/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(val)) {
+                      const abs = parseHMS(val)
+                      if (abs !== null) {
+                        // Use absolute HH:MM:SS from start; convert to minutes from now
+                        const mins = Math.max(0, Math.round((abs - currentSeconds)/60))
+                        handleSnoozeInject(snoozeInjectId, mins)
+                      }
+                    } else {
+                      const minsNum = Number(val)
+                      if (!isNaN(minsNum) && minsNum >= 0) {
+                        handleSnoozeInject(snoozeInjectId, minsNum)
+                      }
+                    }
+                    setSnoozeInjectId(null)
+                    setSnoozeInput('')
+                  }}
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded"
+                >
+                  Snooze
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50" aria-live="polite">
+          <div className="bg-gray-800 text-white px-4 py-2 rounded shadow-lg border border-gray-600">
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
