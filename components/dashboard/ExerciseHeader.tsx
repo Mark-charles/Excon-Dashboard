@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useCallback } from 'react'
-import Link from 'next/link'
-import { Cog } from 'lucide-react'
+
+
 
 export type ExerciseHeaderProps = {
   exerciseName: string
@@ -47,9 +47,6 @@ const ExerciseHeader: React.FC<ExerciseHeaderProps> = ({
   if (readonly) {
     return (
       <div className="bg-gray-800 rounded-lg p-4 mb-6 relative">
-        <Link href="/admin" className="absolute right-3 top-3 text-gray-300 hover:text-white" aria-label="Open Administration">
-          <Cog className="w-5 h-5" />
-        </Link>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-gray-300 mb-1">Exercise Name</span>
@@ -70,9 +67,6 @@ const ExerciseHeader: React.FC<ExerciseHeaderProps> = ({
 
   return (
     <div className="bg-gray-800 rounded-lg p-4 mb-6 relative">
-      <Link href="/admin" className="absolute right-3 top-3 text-gray-300 hover:text-white" aria-label="Open Administration">
-        <Cog className="w-5 h-5" />
-      </Link>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="flex flex-col">
           <label className="text-sm font-semibold text-gray-300 mb-1">Exercise Name</label>
