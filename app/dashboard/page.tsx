@@ -469,6 +469,39 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     resetTimer()
   }
 
+  // Reset entire exercise (names, times, injects/resources, and timer)
+  const handleResetExercise = () => {
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm('Reset exercise? This will clear names, finish time, injects, resources, and reset the timer to 00:00:00.')
+      if (!ok) return
+    }
+    try {
+      setExerciseName('')
+      setControllerName('')
+      setExerciseFinishTime('')
+      setInjects([])
+      setResources([])
+      setSeconds(0)
+      resetTimer()
+    } catch {}
+  }
+
+  const handleClearInjects = () => {
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm('Delete all injects? This cannot be undone.')
+      if (!ok) return
+    }
+    setInjects([])
+  }
+
+  const handleClearResources = () => {
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm('Delete all resources? This cannot be undone.')
+      if (!ok) return
+    }
+    setResources([])
+  }
+
   const handleManualTimeSet = (timeInput: string) => {
     const parsedSeconds = parseHMS(timeInput)
     if (parsedSeconds !== null) {
@@ -1421,6 +1454,113 @@ const getInjectTypeTextColor = (type: InjectType): string => {
             onImportClick={handleResourceImportClickCallback}
             disabled={!canEdit}
           />
+        </div>
+      </div>
+
+      {/* Import Modals */}
+      {/* Admin / Setup Controls */}
+      <div className="mt-6 bg-gray-800 rounded-lg p-6">
+        <div className="mb-4">
+          <h3 className="text-2xl font-bold text-white">Admin Controls</h3>
+          <p className="text-sm text-gray-400">Import/Export, reset, and summary</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {/* Export JSON */}
+          <button
+            onClick={saveScenarioJSON}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={!canEdit}
+            title="Export scenario to JSON"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>Export JSON</span>
+          </button>
+
+          {/* Import JSON */}
+          <div className="flex items-stretch gap-3">
+            <input
+              ref={scenarioFileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0]
+                if (f) await handleScenarioLoad(f)
+                // reset input so same file can be selected again later
+                if (e.target) e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => { if (canEdit) scenarioFileInputRef.current?.click() }}
+              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={!canEdit}
+              title="Import scenario from JSON"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span>Import JSON</span>
+            </button>
+          </div>
+
+          {/* CSV exports */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={exportInjectsImportCSV}
+              className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded disabled:opacity-50"
+              disabled={!canEdit}
+              title="Export injects CSV for import"
+            >
+              Injects CSV
+            </button>
+            <button
+              onClick={exportResourcesCSV}
+              className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded disabled:opacity-50"
+              disabled={!canEdit}
+              title="Export resources CSV"
+            >
+              Resources CSV
+            </button>
+          </div>
+
+          {/* Reset and clear */}
+          <button
+            onClick={handleResetExercise}
+            className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={!canEdit}
+            title="Reset entire exercise"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Reset Exercise</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClearInjects}
+              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+              disabled={!canEdit}
+              title="Delete all injects"
+            >
+              Clear Injects
+            </button>
+            <button
+              onClick={handleClearResources}
+              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+              disabled={!canEdit}
+              title="Delete all resources"
+            >
+              Clear Resources
+            </button>
+          </div>
+
+          {/* Printable summary */}
+          <button
+            onClick={() => { if (typeof window !== 'undefined') window.open('/display/summary', 'SummaryDisplay', 'noopener,noreferrer,width=1100,height=800') }}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-2"
+            title="Open printable exercise summary"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>Open Summary (Print)</span>
+          </button>
         </div>
       </div>
 
