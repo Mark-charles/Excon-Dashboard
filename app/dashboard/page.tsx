@@ -37,16 +37,8 @@ export default function Dashboard() {
   const setControllerName = useDashboardStore(s => s.setControllerName)
   const exerciseFinishTime = useDashboardStore(s => s.exerciseFinishTime)
   const setExerciseFinishTime = useDashboardStore(s => s.setExerciseFinishTime)
-  // Roles + edit lock (local-only). Admin always editable; operators obey edit lock; viewers are read-only.
-  const [role, setRole] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'admin'
-    return localStorage.getItem('excon-role') || 'admin'
-  })
-  const [editLock, setEditLock] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    return (localStorage.getItem('excon-edit-lock') || 'false') === 'true'
-  })
-  const canEdit = role === 'admin' || (role === 'operator' && !editLock)
+  // Simplified: single unified view (no roles/locks)
+  const canEdit = true
   
   // Stable callback functions for ExerciseHeader
   const handleExerciseNameChange = useCallback((value: string) => {
@@ -158,15 +150,7 @@ export default function Dashboard() {
     return () => unsub()
   }, [])
 
-  // Listen for role/lock changes via storage (e.g., Admin page)
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "excon-role") setRole(localStorage.getItem("excon-role") || "admin")
-      if (e.key === "excon-edit-lock") setEditLock((localStorage.getItem("excon-edit-lock") || "false") === "true")
-    }
-    if (typeof window !== "undefined") window.addEventListener("storage", onStorage)
-    return () => { if (typeof window !== "undefined") window.removeEventListener("storage", onStorage) }
-  }, [])
+  // Roles removed; no role or edit-lock listeners
 
 
   
@@ -1460,28 +1444,20 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       {/* Import Modals */}
       {/* Admin / Setup Controls */}
       <div className="mt-6 bg-gray-800 rounded-lg p-6">
-        <div className="mb-4">
-          <h3 className="text-2xl font-bold text-white">Admin Controls</h3>
-          <p className="text-sm text-gray-400">Import/Export, reset, and summary</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <h3 className="text-2xl font-bold text-white mb-4">Admin</h3>
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-4">
           {/* Export JSON */}
-          <div className="bg-gray-800/60 rounded p-3">
-            <div className="text-xs text-gray-400 mb-2">Download current scenario</div>
-            <button
-              onClick={saveScenarioJSON}
-              className="w-full px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={!canEdit}
-              title="Export scenario to JSON"
-            >
-              <FileDown className="w-4 h-4" />
-              <span>Export JSON</span>
-            </button>
-          </div>
+          <button
+            onClick={saveScenarioJSON}
+            className="flex flex-col items-center justify-center p-3 rounded bg-gray-700 hover:bg-gray-600 text-white"
+            title="Export scenario to JSON"
+          >
+            <FileDown className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-300">Export JSON</span>
+          </button>
 
           {/* Import JSON */}
-          <div className="bg-gray-800/60 rounded p-3">
-            <div className="text-xs text-gray-400 mb-2">Load scenario from JSON</div>
+          <>
             <input
               ref={scenarioFileInputRef}
               type="file"
@@ -1494,88 +1470,74 @@ const getInjectTypeTextColor = (type: InjectType): string => {
               }}
             />
             <button
-              onClick={() => { if (canEdit) scenarioFileInputRef.current?.click() }}
-              className="w-full px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={!canEdit}
+              onClick={() => scenarioFileInputRef.current?.click()}
+              className="flex flex-col items-center justify-center p-3 rounded bg-gray-700 hover:bg-gray-600 text-white"
               title="Import scenario from JSON"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <span>Import JSON</span>
+              <ArrowUp className="w-6 h-6" />
+              <span className="mt-1 text-xs text-gray-300">Import JSON</span>
             </button>
-          </div>
+          </>
 
-          {/* CSV exports */}
-          <div className="bg-gray-800/60 rounded p-3">
-            <div className="text-xs text-gray-400 mb-2">Export CSVs for editing</div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={exportInjectsImportCSV}
-                className="flex-1 px-3 py-2 text-sm bg-purple-700 hover:bg-purple-800 text-white rounded disabled:opacity-50"
-                disabled={!canEdit}
-                title="Export injects CSV for import"
-              >
-                Injects CSV
-              </button>
-              <button
-                onClick={exportResourcesCSV}
-                className="flex-1 px-3 py-2 text-sm bg-purple-700 hover:bg-purple-800 text-white rounded disabled:opacity-50"
-                disabled={!canEdit}
-                title="Export resources CSV"
-              >
-                Resources CSV
-              </button>
-            </div>
-          </div>
+          {/* CSV: Injects */}
+          <button
+            onClick={exportInjectsImportCSV}
+            className="flex flex-col items-center justify-center p-3 rounded bg-gray-700 hover:bg-gray-600 text-white"
+            title="Export injects CSV"
+          >
+            <FileDown className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-300">Injects CSV</span>
+          </button>
 
-          {/* Reset and clear */}
-          <div className="bg-gray-800/60 rounded p-3">
-            <div className="text-xs text-gray-400 mb-2">Full reset of exercise</div>
-            <button
-              onClick={handleResetExercise}
-              className="w-full px-3 py-2 text-sm bg-red-700 hover:bg-red-800 text-white rounded flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={!canEdit}
-              title="Reset entire exercise"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Reset Exercise</span>
-            </button>
-          </div>
-          <div className="bg-gray-800/60 rounded p-3">
-            <div className="text-xs text-gray-400 mb-2">Bulk delete lists</div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleClearInjects}
-                className="flex-1 px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
-                disabled={!canEdit}
-                title="Delete all injects"
-              >
-                Clear Injects
-              </button>
-              <button
-                onClick={handleClearResources}
-                className="flex-1 px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
-                disabled={!canEdit}
-                title="Delete all resources"
-              >
-                Clear Resources
-              </button>
-            </div>
-          </div>
+          {/* CSV: Resources */}
+          <button
+            onClick={exportResourcesCSV}
+            className="flex flex-col items-center justify-center p-3 rounded bg-gray-700 hover:bg-gray-600 text-white"
+            title="Export resources CSV"
+          >
+            <FileDown className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-300">Resources CSV</span>
+          </button>
 
-          {/* Printable summary */}
-          <div className="bg-gray-800/60 rounded p-3">
-            <div className="text-xs text-gray-400 mb-2">Open evaluator-friendly view</div>
-            <button
-              onClick={() => { if (typeof window !== 'undefined') window.open('/display/summary', 'SummaryDisplay', 'noopener,noreferrer,width=1100,height=800') }}
-              className="w-full px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center justify-center gap-2"
-              title="Open printable exercise summary"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Summary (Print)</span>
-            </button>
-          </div>
+          {/* Reset Exercise */}
+          <button
+            onClick={handleResetExercise}
+            className="flex flex-col items-center justify-center p-3 rounded bg-red-700 hover:bg-red-800 text-white"
+            title="Reset entire exercise"
+          >
+            <RotateCcw className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-100">Reset</span>
+          </button>
+
+          {/* Clear Injects */}
+          <button
+            onClick={handleClearInjects}
+            className="flex flex-col items-center justify-center p-3 rounded bg-red-600 hover:bg-red-700 text-white"
+            title="Delete all injects"
+          >
+            <Trash2 className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-100">Clear Injects</span>
+          </button>
+
+          {/* Clear Resources */}
+          <button
+            onClick={handleClearResources}
+            className="flex flex-col items-center justify-center p-3 rounded bg-red-600 hover:bg-red-700 text-white"
+            title="Delete all resources"
+          >
+            <Trash2 className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-100">Clear Resources</span>
+          </button>
+
+          {/* Summary */}
+          <button
+            onClick={() => { if (typeof window !== 'undefined') window.open('/display/summary', 'SummaryDisplay', 'noopener,noreferrer,width=1100,height=800') }}
+            className="flex flex-col items-center justify-center p-3 rounded bg-gray-700 hover:bg-gray-600 text-white"
+            title="Open printable summary"
+          >
+            <ExternalLink className="w-6 h-6" />
+            <span className="mt-1 text-xs text-gray-300">Summary</span>
+          </button>
         </div>
       </div>
 
