@@ -1,7 +1,9 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { readSnapshot, subscribeState, type DashboardState } from "@/lib/sync"
+import Image from "next/image"
+import { readSnapshot, subscribeState } from "@/lib/sync"
+import type { DashboardState } from "@/lib/types"
 
 export default function SummaryDisplayPage() {
   const [state, setState] = useState<DashboardState | null>(null)
@@ -67,7 +69,9 @@ export default function SummaryDisplayPage() {
             ) : null}
           </div>
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="Logo" className="h-8 w-auto hidden md:block" />
+            <span className="hidden md:block">
+              <Image src="/logo.svg" alt="Logo" width={120} height={32} priority className="h-8 w-auto" />
+            </span>
           <button
             onClick={() => window.print()}
             className="px-4 py-2 rounded bg-black text-white hover:bg-gray-800"

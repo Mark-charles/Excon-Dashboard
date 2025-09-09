@@ -1,18 +1,18 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { readSnapshot, subscribeState, publishState, type DashboardState } from "@/lib/sync"
+import { readSnapshot, subscribeState, publishState } from "@/lib/sync"
+import type { DashboardState, InjectItem, ResourceItem, ResourceStatus, ResourceKind } from "@/lib/types"
 import { FileDown, Upload, Printer, ExternalLink, Trash2, ArrowLeft } from "lucide-react"
 
 export default function AdminPage() {
-  const [snap, setSnap] = useState<DashboardState | null>(null)
   const [exerciseName, setExerciseName] = useState("")
   const [controllerName, setControllerName] = useState("")
   const [exerciseFinishTime, setExerciseFinishTime] = useState("")
   const [currentSeconds, setCurrentSeconds] = useState(0)
-  const [injects, setInjects] = useState<any[]>([])
-  const [resources, setResources] = useState<any[]>([])
+  const [injects, setInjects] = useState<InjectItem[]>([])
+  const [resources, setResources] = useState<ResourceItem[]>([])
   const [showReset, setShowReset] = useState(false)
   const [confirmText, setConfirmText] = useState("")
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -31,7 +31,6 @@ export default function AdminPage() {
   useEffect(() => {
     const s = readSnapshot()
     if (s) {
-      setSnap(s)
       setExerciseName(s.exerciseName || "")
       setControllerName(s.controllerName || "")
       setExerciseFinishTime(s.exerciseFinishTime || "")
@@ -40,7 +39,6 @@ export default function AdminPage() {
       setResources(Array.isArray(s.resources) ? s.resources : [])
     }
     const unsub = subscribeState((ns) => {
-      setSnap(ns)
       setExerciseName(ns.exerciseName || "")
       setControllerName(ns.controllerName || "")
       setExerciseFinishTime(ns.exerciseFinishTime || "")
@@ -77,11 +75,11 @@ export default function AdminPage() {
       controllerName,
       exerciseFinishTime,
       injects: [...injects]
-        .sort((a:any,b:any)=>a.dueSeconds-b.dueSeconds)
-        .map((i:any)=>({ title:i.title, dueSeconds:i.dueSeconds, type:i.type, to:i.to, from:i.from })),
+        .sort((a,b)=>a.dueSeconds-b.dueSeconds)
+        .map((i)=>({ title:i.title, dueSeconds:i.dueSeconds, type:i.type, to:i.to, from:i.from })),
       resources: [...resources]
-        .sort((a:any,b:any)=>a.etaSeconds-b.etaSeconds)
-        .map((r:any)=>({ label:r.label, etaSeconds:r.etaSeconds, status:r.status, kind:r.kind }))
+        .sort((a,b)=>a.etaSeconds-b.etaSeconds)
+        .map((r)=>({ label:r.label, etaSeconds:r.etaSeconds, status:r.status, kind:r.kind }))
     }
     const blob = new Blob([JSON.stringify(scenario, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -100,22 +98,28 @@ export default function AdminPage() {
       const text = await file.text()
       const data = JSON.parse(text)
       if (!data || data.version !== 'excon-scenario-v1') return
-      const loadedInjects = Array.isArray(data.injects) ? data.injects.map((i:any, idx:number)=>({
+      const loadedInjects: InjectItem[] = Array.isArray(data.injects) ? data.injects.map((i: Record<string, unknown>, idx:number)=>({
         id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.random()}`,
         number: idx+1,
-        title: String(i.title||''),
-        dueSeconds: Number(i.dueSeconds||0),
-        type: String(i.type||'other'),
+        title: String(i['title']||''),
+        dueSeconds: Number(i['dueSeconds']||0),
+        type: String(i['type']||'other'),
         status: 'pending',
-        to: String(i.to||''),
-        from: String(i.from||'')
+        to: String(i['to']||''),
+        from: String(i['from']||'')
       })) : []
-      const loadedResources = Array.isArray(data.resources) ? data.resources.map((r:any)=>({
+      const loadedResources: ResourceItem[] = Array.isArray(data.resources) ? data.resources.map((r: Record<string, unknown>)=>({
         id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.random()}`,
-        label: String(r.label||''),
-        etaSeconds: Number(r.etaSeconds||0),
-        status: ['requested','tasked','enroute','arrived','cancelled'].includes(String(r.status)) ? r.status : 'requested',
-        kind: ['person','vehicle','group','air','capability','supply'].includes(String(r.kind)) ? r.kind : undefined,
+        label: String(r['label']||''),
+        etaSeconds: Number(r['etaSeconds']||0),
+        status: ((['requested','tasked','enroute','arrived','cancelled'] as const) as readonly import('@/lib/types').ResourceStatus[])
+          .includes(String(r['status']) as import('@/lib/types').ResourceStatus)
+            ? (String(r['status']) as import('@/lib/types').ResourceStatus)
+            : 'requested',
+        kind: ((['person','vehicle','group','air','capability','supply'] as const) as readonly import('@/lib/types').ResourceKind[])
+          .includes(String(r['kind']) as import('@/lib/types').ResourceKind)
+            ? (String(r['kind']) as import('@/lib/types').ResourceKind)
+            : undefined,
       })) : []
 
       let next: DashboardState
@@ -125,7 +129,7 @@ export default function AdminPage() {
           controllerName,
           exerciseFinishTime,
           currentSeconds,
-          injects: [...injects, ...loadedInjects].map((i:any, idx:number) => ({ ...i, number: idx+1 })),
+          injects: [...injects, ...loadedInjects].map((i, idx) => ({ ...i, number: idx+1 })),
           resources: [...resources, ...loadedResources],
         }
       } else {
@@ -134,7 +138,7 @@ export default function AdminPage() {
           controllerName: String(data.controllerName || controllerName),
           exerciseFinishTime: String(data.exerciseFinishTime || exerciseFinishTime),
           currentSeconds: typeof data.currentSeconds === 'number' ? data.currentSeconds : 0,
-          injects: loadedInjects.map((i:any, idx:number)=>({ ...i, number: idx+1 })),
+          injects: loadedInjects.map((i, idx)=>({ ...i, number: idx+1 })),
           resources: loadedResources,
         }
       }

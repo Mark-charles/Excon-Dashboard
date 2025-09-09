@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { readSnapshot, subscribeState, type DashboardState } from "@/lib/sync"
+import { readSnapshot, subscribeState } from "@/lib/sync"
+import type { DashboardState } from "@/lib/types"
 
 type ResourceStatus = "requested" | "tasked" | "enroute" | "arrived" | "cancelled"
 

@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { readSnapshot, subscribeState, type DashboardState } from "@/lib/sync"
+import { readSnapshot, subscribeState } from "@/lib/sync"
+import type { DashboardState } from "@/lib/types"
 
 export default function TimerDisplayPage() {
   const [state, setState] = useState<DashboardState | null>(null)

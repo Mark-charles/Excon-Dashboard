@@ -29,3 +29,14 @@ Use the built-in “Download Template” buttons in the import dialogs for CSV t
 ## Roadmap
 See `plan.md` for phases and upcoming work (templates, export, real-time sync, AAR, mapping).
 
+## Import Template Structure
+- Injects CSV columns: `Title`, `Due (minutes)`, `Type`, `To`, `From`
+  - Time accepts minutes (e.g., 15), absolute `HH:MM:SS` from start (e.g., 01:30:00), or seconds if the header includes "second"/"sec".
+  - Type accepts: in person, radio/phone, electronic, map inject, other (case-insensitive; common abbreviations like ip/rp/e/m/o are mapped).
+- Resources CSV columns: `Label`, `Kind (optional)`, `ETA (minutes)`, `Status`
+  - ETA accepts minutes, absolute `HH:MM:SS`, or seconds if the header includes "second"/"sec".
+  - Status accepts: requested, tasked, enroute, arrived, cancelled.
+
+Notes
+- CSVs exported from the app or the templates can be re-imported directly.
+- Excel files (`.xlsx` / `.xls`) are also supported.

@@ -1,15 +1,7 @@
 "use client"
 
 // Simple cross-window sync using BroadcastChannel with storage fallback
-
-export type DashboardState = {
-  exerciseName: string
-  controllerName: string
-  exerciseFinishTime: string
-  currentSeconds: number
-  injects: any[]
-  resources: any[]
-}
+import type { DashboardState } from './types'
 
 const CHANNEL_NAME = "excon-dashboard-sync-v1"
 const STORAGE_KEY = "excon-dashboard-state-v1"
@@ -72,4 +64,3 @@ export function readSnapshot(): DashboardState | null {
     return null
   }
 }
-
