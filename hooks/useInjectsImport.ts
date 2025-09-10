@@ -121,7 +121,6 @@ export function useInjectsImport(params: {
       const newInjects = previewInjects.filter(inject => !existingKeys.has(`${inject.title}:${inject.dueSeconds}`))
       setInjects(prev => renumberInjects([...(prev as InjectItem[]), ...newInjects]))
       const duplicateCount = previewInjects.length - newInjects.length
-      // eslint-disable-next-line no-console
       console.log(`Imported ${newInjects.length} inject(s). Skipped ${validationErrors.length} invalid and ${duplicateCount} duplicate row(s).`)
     }
     setOpen(false)

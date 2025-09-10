@@ -129,7 +129,6 @@ export function useResourcesImport(params: {
       const newResources = previewResources.filter(resource => !existingKeys.has(`${resource.label}:${resource.etaSeconds}`))
       setResources(prev => ([...(prev as ResourceItem[]), ...newResources]))
       const duplicateCount = previewResources.length - newResources.length
-      // eslint-disable-next-line no-console
       console.log(`Imported ${newResources.length} resource(s). Skipped ${validationErrors.length} invalid and ${duplicateCount} duplicate row(s).`)
     }
     setOpen(false)

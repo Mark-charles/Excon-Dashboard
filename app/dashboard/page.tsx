@@ -2,28 +2,27 @@
 
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { User, Users, Phone, Cpu, MapPin, Tag, ClipboardCheck, Truck, CheckCircle2, XCircle, Clock, Plane, Cog, Package, Volume2, VolumeX, ExternalLink, FileDown, Play as PlayIcon, ArrowUp, ArrowDown, Check, RotateCcw, Slash, Trash2 } from 'lucide-react'
+import { ExternalLink, FileDown, ArrowUp, RotateCcw, Trash2 } from 'lucide-react'
 import ExerciseHeader from '@/components/dashboard/ExerciseHeader'
 import ExerciseOverview from '@/components/dashboard/ExerciseOverview'
-import * as XLSX from 'xlsx'
 import { publishState, subscribeState } from '@/lib/sync'
-import { normalizeHeader, downloadCSV } from '@/lib/csv'
-import TimelineFilterBar from '@/components/dashboard/TimelineFilterBar'
-import Timeline from '@/components/dashboard/Timeline'
+import { downloadCSV } from '@/lib/csv'
 import { formatHMS, parseHMS } from '@/lib/time'
 import AddInjectForm from '@/components/dashboard/AddInjectForm'
 import AddResourceForm from '@/components/dashboard/AddResourceForm'
 import ImportInjectsModal from '@/components/dashboard/ImportInjectsModal'
 import ImportResourcesModal from '@/components/dashboard/ImportResourcesModal'
+import TimerControls from '@/components/dashboard/TimerControls'
+import ResourceRequestBoard from '@/components/dashboard/ResourceRequestBoard'
+import DashboardTimeline from '@/components/dashboard/DashboardTimeline'
 import { useDashboardStore } from '@/lib/store'
 import { useInjectsImport } from '@/hooks/useInjectsImport'
 import { useResourcesImport } from '@/hooks/useResourcesImport'
 import { mapInjectType, generateId, renumberInjects } from '@/lib/helpers'
-import type { InjectItem, ResourceItem, InjectType, InjectStatus, ResourceStatus, ResourceKind } from '@/lib/types'
+import type { InjectItem, ResourceItem, InjectType, ResourceStatus, ResourceKind } from '@/lib/types'
 
 // Types moved to '@/lib/types'
 
-const initialInjects: InjectItem[] = []
 
 // Components moved to '@/components/dashboard'
 
@@ -58,8 +57,6 @@ export default function Dashboard() {
   // Timer and main state
   const currentSeconds = useDashboardStore(s => s.currentSeconds)
   const isRunning = useDashboardStore(s => s.isRunning)
-  const start = useDashboardStore(s => s.start)
-  const stop = useDashboardStore(s => s.stop)
   const resetTimer = useDashboardStore(s => s.reset)
   const setSeconds = useDashboardStore(s => s.setSeconds)
   const tick = useDashboardStore(s => s.tick)
@@ -81,7 +78,6 @@ export default function Dashboard() {
   const toastTimeoutRef = useRef<number | null>(null)
   
   // Shared focus-visible ring style for accessibility
-  const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
 
   // Local persistence of key state (hydrate store)
   useEffect(() => {
@@ -98,7 +94,7 @@ export default function Dashboard() {
         if (typeof parsed.currentSeconds === 'number' && parsed.currentSeconds >= 0) setSeconds(parsed.currentSeconds)
       }
     } catch {}
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     try {
@@ -148,7 +144,7 @@ export default function Dashboard() {
       else if (injectsChanged || resourcesChanged) showToast('Scenario updated')
     })
     return () => unsub()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Roles removed; no role or edit-lock listeners
 
@@ -171,8 +167,6 @@ export default function Dashboard() {
   })
 
   // Snooze modal state
-  const [snoozeInjectId, setSnoozeInjectId] = useState<string | null>(null)
-  const [snoozeInput, setSnoozeInput] = useState<string>('')
 
   // Persist auto-advance toggle
   useEffect(() => {
@@ -200,26 +194,9 @@ export default function Dashboard() {
       })
       return changed ? next : prev
     })
-  }, [currentSeconds, autoAdvanceResources])
+  }, [currentSeconds, autoAdvanceResources, setResources])
 
   // Inline editing state
-  const [editingField, setEditingField] = useState<{id: string, field: string} | null>(null)
-  const [editingValue, setEditingValue] = useState<string>('')
-
-  // Filter state
-  const [showInjects, setShowInjects] = useState(true)
-  const [showResources, setShowResources] = useState(true)
-  const [showInPerson, setShowInPerson] = useState(true)
-  const [showRadioPhone, setShowRadioPhone] = useState(true)
-  const [showElectronic, setShowElectronic] = useState(true)
-  const [showMapInject, setShowMapInject] = useState(true)
-  const [showOther, setShowOther] = useState(true)
-  const [showRequestedStatus, setShowRequestedStatus] = useState(true)
-  const [showTaskedStatus, setShowTaskedStatus] = useState(true)
-  const [showEnrouteStatus, setShowEnrouteStatus] = useState(true)
-  const [showArrivedStatus, setShowArrivedStatus] = useState(true)
-  const [showCancelledStatus, setShowCancelledStatus] = useState(true)
-
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null
     if (isRunning) {
@@ -230,14 +207,14 @@ export default function Dashboard() {
 
   // Auto-check for missed injects
   useEffect(() => {
-    setInjects(prevInjects => 
+    setInjects(prevInjects =>
       prevInjects.map(inject => 
         inject.status === "pending" && currentSeconds > inject.dueSeconds
           ? { ...inject, status: "missed" as const }
           : inject
       )
     )
-  }, [currentSeconds])
+  }, [currentSeconds, setInjects])
 
   // Detect newly due and newly missed injects for audio cues
   useEffect(() => {
@@ -281,7 +258,16 @@ export default function Dashboard() {
 
   const playBeep = (times: number) => {
     try {
-      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext
+      const AudioCtx = (
+        window as unknown as {
+          AudioContext: typeof AudioContext
+          webkitAudioContext?: typeof AudioContext
+        }
+      ).AudioContext ||
+        (window as unknown as {
+          AudioContext: typeof AudioContext
+          webkitAudioContext?: typeof AudioContext
+        }).webkitAudioContext
       if (!AudioCtx) return
       const ctx = new AudioCtx()
       const duration = 0.12
@@ -318,21 +304,10 @@ export default function Dashboard() {
       })
       return changed ? next : prevResources
     })
-  }, [currentSeconds])
+  }, [currentSeconds, setResources])
 
   // formatHMS/parseHMS imported from '@/lib/time'
 
-
-
-  const getInjectStatusColor = (status: InjectStatus): string => {
-    switch (status) {
-      case "pending": return "bg-gray-500 text-white"
-      case "completed": return "bg-green-500 text-white"
-      case "missed": return "bg-red-500 text-white"
-      case "skipped": return "bg-orange-500 text-white"
-      default: return "bg-gray-500 text-white"
-    }
-  }
 
 
   const getInjectTypeColor = (type: InjectType): string => {
@@ -345,113 +320,11 @@ export default function Dashboard() {
       default: return "bg-gray-500"
     }
   }
-const getInjectTypeTextColor = (type: InjectType): string => {
-    switch (type) {
-      case "in person": return "text-blue-400"
-      case "radio/phone": return "text-green-400"
-      case "electronic": return "text-purple-400"
-      case "map inject": return "text-red-400"
-      case "other": return "text-orange-400"
-      default: return "text-gray-400"
-    }
-  }
-
-  const getResourceStatusTextColor = (status: ResourceStatus): string => {
-    switch (status) {
-      case "requested": return "text-gray-400"
-      case "tasked": return "text-amber-400"
-      case "enroute": return "text-blue-400"
-      case "arrived": return "text-green-400"
-      case "cancelled": return "text-red-400"
-      default: return "text-gray-400"
-    }
-  }
-
-  // Icon helpers (SVG components via lucide-react)
-  const getInjectTypeIcon = (type: InjectType) => {
-    const props = { size: 16, className: "inline align-middle" }
-    switch (type) {
-      case 'in person': return <User {...props} />
-      case 'radio/phone': return <Phone {...props} />
-      case 'electronic': return <Cpu {...props} />
-      case 'map inject': return <MapPin {...props} />
-      case 'other': return <Tag {...props} />
-      default: return <Tag {...props} />
-    }
-  }
-
-  const getResourceStatusIcon = (status: ResourceStatus) => {
-    const props = { size: 16, className: "inline align-middle" }
-    switch (status) {
-      case 'requested': return <Clock {...props} />
-      case 'tasked': return <ClipboardCheck {...props} />
-      case 'enroute': return <Truck {...props} />
-      case 'arrived': return <CheckCircle2 {...props} />
-      case 'cancelled': return <XCircle {...props} />
-      default: return <Tag {...props} />
-    }
-  }
-
-
-  const getResourceKindIcon = (kind?: ResourceKind) => {
-    const props = { size: 16, className: "inline align-middle" }
-    switch (kind) {
-      case 'person': return <User {...props} />
-      case 'vehicle': return <Truck {...props} />
-      case 'group': return <Users {...props} />
-      case 'air': return <Plane {...props} />
-      case 'capability': return <Cog {...props} />
-      case 'supply': return <Package {...props} />
-      default: return <Truck {...props} />
-    }
-  }
-  const isCurrentInject = (inject: InjectItem): boolean => {
-    const timeDiff = Math.abs(currentSeconds - inject.dueSeconds)
-    return timeDiff <= 30
-  }
-
   // Import helper functions moved to '@/lib/csv'
 
   // mapInjectType, generateId moved to '@/lib/helpers'
 
 
-
-  // Resource helper functions
-  const getResourceStatusColor = (status: ResourceStatus): string => {
-    switch (status) {
-      case "requested": return "bg-gray-500 text-white"
-      case "tasked": return "bg-amber-500 text-white"
-      case "enroute": return "bg-blue-600 text-white"
-      case "arrived": return "bg-green-500 text-white"
-      case "cancelled": return "bg-red-500 text-white"
-      default: return "bg-gray-500 text-white"
-    }
-  }
-
-
-  const isTerminalStatus = (status: ResourceStatus): boolean => {
-    return status === "arrived" || status === "cancelled"
-  }
-
-  const canTransitionTo = (currentStatus: ResourceStatus, targetStatus: ResourceStatus): boolean => {
-    if (isTerminalStatus(currentStatus)) return false
-    
-    switch (currentStatus) {
-      case "requested": return targetStatus === "tasked" || targetStatus === "cancelled"
-      case "tasked": return targetStatus === "enroute" || targetStatus === "cancelled"
-      case "enroute": return targetStatus === "arrived" || targetStatus === "cancelled"
-      default: return false
-    }
-  }
-
-  // Timer handlers
-  const handleStartStop = () => {
-    if (isRunning) stop(); else start()
-  }
-
-  const handleReset = () => {
-    resetTimer()
-  }
 
   // Reset entire exercise (names, times, injects/resources, and timer)
   const handleResetExercise = () => {
@@ -486,83 +359,6 @@ const getInjectTypeTextColor = (type: InjectType): string => {
     setResources([])
   }
 
-  const handleManualTimeSet = (timeInput: string) => {
-    const parsedSeconds = parseHMS(timeInput)
-    if (parsedSeconds !== null) {
-      setSeconds(parsedSeconds)
-    }
-  }
-
-  // Inject status handlers
-  const handleToggleInjectStatus = (injectId: string) => {
-    setInjects(prevInjects => 
-      prevInjects.map(inject => 
-        inject.id === injectId 
-          ? { ...inject, status: inject.status === "completed" ? "pending" as const : "completed" as const }
-          : inject
-      )
-    )
-  }
-
-  // Ack removed from UI; keep placeholder if needed later
-  // const handleAckInject = (injectId: string, ack: boolean) => {
-  //   setInjects(prev => prev.map(i => i.id === injectId ? { ...i, acked: ack } : i))
-  // }
-
-  // Snooze removed from UI; keeping function commented for potential future use
-  // const handleSnoozeInject = (injectId: string, minutes: number) => {
-  //   const offset = Math.max(0, Math.round(minutes * 60))
-  //   setInjects(prev => renumberInjects(prev.map(i => i.id === injectId ? { ...i, dueSeconds: currentSeconds + offset, acked: false } : i)))
-  //   alertedDueRef.current.delete(injectId)
-  // }
-
-  const handlePlayInjectAudio = (injectId: string) => {
-    const inject = injects.find(i => i.id === injectId)
-    if (inject?.audioDataUrl) {
-      try {
-        const audio = new Audio(inject.audioDataUrl)
-        void audio.play()
-      } catch {}
-    }
-  }
-
-  // Resource handlers
-  const handleResourceStatusChange = (resourceId: string, newStatus: ResourceStatus) => {
-    setResources(prevResources => 
-      prevResources.map(resource => 
-        resource.id === resourceId && canTransitionTo(resource.status, newStatus)
-          ? { ...resource, status: newStatus }
-          : resource
-      )
-    )
-  }
-
-  const handleResourceETAEdit = (resourceId: string, newETATime: string) => {
-    let newETASeconds: number | null = null
-    const val = newETATime.trim()
-    if (/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(val)) {
-      newETASeconds = parseHMS(val)
-    } else {
-      const num = Number(val)
-      if (!isNaN(num) && num >= 0) {
-        // treat numeric as minutes from now
-        newETASeconds = currentSeconds + Math.round(num * 60)
-      }
-    }
-    if (newETASeconds !== null) {
-      setResources(prevResources =>
-        prevResources.map(resource =>
-          resource.id === resourceId
-            ? { ...resource, etaSeconds: newETASeconds }
-            : resource
-        )
-      )
-    }
-  }
-
-
-
-
   // Form handlers
   // renumberInjects moved to '@/lib/helpers'
 
@@ -585,114 +381,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       }
       setInjects(prev => renumberInjects([...prev, newInject]))
     }
-  }, [renumberInjects])
-
-  // Inject management functions
-  const handleDeleteInject = (id: string) => {
-    setInjects(prev => renumberInjects(prev.filter(inject => inject.id !== id)))
-  }
-
-  const handleSkipInject = (id: string) => {
-    setInjects(prev => 
-      prev.map(inject => 
-        inject.id === id 
-          ? { ...inject, status: "skipped" as const }
-          : inject
-      )
-    )
-  }
-
-  const handleMoveInject = (id: string, direction: 'up' | 'down') => {
-    setInjects(prev => {
-      const sorted = [...prev].sort((a, b) => a.dueSeconds - b.dueSeconds)
-      const index = sorted.findIndex(inject => inject.id === id)
-      
-      if (index === -1) return prev
-      if (direction === 'up' && index === 0) return prev
-      if (direction === 'down' && index === sorted.length - 1) return prev
-      
-      const newIndex = direction === 'up' ? index - 1 : index + 1
-      const targetInject = sorted[newIndex]
-      
-      // Swap due times to maintain order
-      const currentInject = sorted[index]
-      const newDueSeconds = targetInject.dueSeconds
-      const targetNewDueSeconds = currentInject.dueSeconds
-      
-      return renumberInjects(prev.map(inject => {
-        if (inject.id === id) return { ...inject, dueSeconds: newDueSeconds }
-        if (inject.id === targetInject.id) return { ...inject, dueSeconds: targetNewDueSeconds }
-        return inject
-      }))
-    })
-  }
-
-  // Inline editing functions
-  const handleStartEdit = (id: string, field: string, currentValue: string | number) => {
-    if (!canEdit) return
-    setEditingField({ id, field })
-    setEditingValue(String(currentValue))
-  }
-
-  const handleCancelEdit = () => {
-    setEditingField(null)
-    setEditingValue('')
-  }
-
-  const handleSaveEdit = () => {
-    if (!editingField) return
-
-    const { id, field } = editingField
-    const value = editingValue.trim()
-
-    setInjects(prev => {
-      const updated = prev.map(inject => {
-        if (inject.id !== id) return inject
-
-        switch (field) {
-          case 'number': {
-            const newNumber = parseInt(value)
-            if (isNaN(newNumber) || newNumber < 1) return inject
-            return { ...inject, number: newNumber }
-          }
-          case 'dueTime': {
-            const dueSeconds = parseHMS(value)
-            if (dueSeconds === null) return inject
-            return { ...inject, dueSeconds }
-          }
-          case 'title':
-            if (!value) return inject
-            return { ...inject, title: value }
-          case 'type':
-            if (!['in person', 'radio/phone', 'electronic', 'map inject', 'other'].includes(value)) return inject
-            return { ...inject, type: value as InjectType }
-          case 'to':
-            return { ...inject, to: value }
-          case 'from':
-            return { ...inject, from: value }
-          default:
-            return inject
-        }
-      })
-
-      // Re-number based on due time order if time or number was changed
-      if (field === 'dueTime') {
-        return renumberInjects(updated)
-      }
-      return updated
-    })
-
-    setEditingField(null)
-    setEditingValue('')
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSaveEdit()
-    } else if (e.key === 'Escape') {
-      handleCancelEdit()
-    }
-  }
+  }, [setInjects])
 
   const handleAddResource = useCallback((label: string, etaMinutes: number, kind: ResourceKind) => {
     if (label.trim() && etaMinutes >= 0) {
@@ -706,7 +395,7 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       }
       setResources(prev => [...prev, newResource])
     }
-  }, [currentSeconds])
+  }, [currentSeconds, setResources])
 
   // Stable callback functions for forms (defined after their dependencies to avoid TDZ)
   const handleAddInjectCallback = useCallback((
@@ -772,24 +461,38 @@ const getInjectTypeTextColor = (type: InjectType): string => {
       const data = JSON.parse(text)
       if (!data || typeof data !== 'object' || data.version !== 'excon-scenario-v1') return
       // Basic shape checks
-      const loadedInjects: InjectItem[] = Array.isArray(data.injects) ? data.injects.map((i: any, idx: number) => ({
-        id: generateId(),
-        number: idx + 1,
-        title: String(i.title || ''),
-        dueSeconds: Number(i.dueSeconds || 0),
-        type: mapInjectType(String(i.type || 'other')),
-        status: 'pending',
-        to: String(i.to || ''),
-        from: String(i.from || '')
-      })) : []
+      const loadedInjects: InjectItem[] = Array.isArray(data.injects)
+        ? data.injects.map((i, idx) => {
+            const obj = i as Record<string, unknown>
+            return {
+              id: generateId(),
+              number: idx + 1,
+              title: String(obj.title || ''),
+              dueSeconds: Number(obj.dueSeconds || 0),
+              type: mapInjectType(String(obj.type || 'other')),
+              status: 'pending',
+              to: String(obj.to || ''),
+              from: String(obj.from || ''),
+            }
+          })
+        : []
 
-      const loadedResources: ResourceItem[] = Array.isArray(data.resources) ? data.resources.map((r: any) => ({
-        id: generateId(),
-        label: String(r.label || ''),
-        etaSeconds: Number(r.etaSeconds || 0),
-        status: (['requested','tasked','enroute','arrived','cancelled'].includes(String(r.status))) ? r.status as ResourceStatus : 'requested',
-        kind: (['person','vehicle','group','air','capability','supply'].includes(String(r.kind))) ? r.kind as any : undefined,
-      })) : []
+      const loadedResources: ResourceItem[] = Array.isArray(data.resources)
+        ? data.resources.map(r => {
+            const obj = r as Record<string, unknown>
+            return {
+              id: generateId(),
+              label: String(obj.label || ''),
+              etaSeconds: Number(obj.etaSeconds || 0),
+              status: (['requested', 'tasked', 'enroute', 'arrived', 'cancelled'].includes(String(obj.status))
+                ? (obj.status as ResourceStatus)
+                : 'requested'),
+              kind: (['person', 'vehicle', 'group', 'air', 'capability', 'supply'].includes(String(obj.kind))
+                ? (obj.kind as ResourceKind)
+                : undefined),
+            }
+          })
+        : []
 
       setInjects(renumberInjects(loadedInjects))
       setResources(loadedResources)
@@ -822,528 +525,6 @@ const getInjectTypeTextColor = (type: InjectType): string => {
 
 
 
-  // Resource import handlers
-
-
-  const downloadResourceTemplate = () => {
-    const templateData = [
-      ['Label', 'Kind (optional)', 'ETA (minutes)', 'Status'],
-      ['Fire Engine 1', 'vehicle', '15', 'requested'],
-      ['Ambulance 2', 'vehicle', '20', 'requested'],
-      ['Police Unit 3', 'vehicle', '10', 'requested'],
-      ['Hazmat Team', 'group', '45', 'requested']
-    ]
-    
-    const worksheet = XLSX.utils.aoa_to_sheet(templateData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resources Template')
-    // Explicitly write CSV to avoid inference issues on some browsers
-    XLSX.writeFile(workbook, 'resources_template.csv', { bookType: 'csv' })
-  }
-
-  // Internal Components
-
-  const TimerControls = () => {
-    const [manualTime, setManualTime] = useState('')
-
-    const handleManualSubmit = (e: React.FormEvent) => {
-      e.preventDefault()
-      if (manualTime.trim()) {
-        handleManualTimeSet(manualTime.trim())
-        setManualTime('')
-      }
-    }
-
-    return (
-      <div className="bg-gray-800 rounded-lg p-6">
-        <div className="flex items-start justify-end mb-2">
-          <button
-            onClick={() => { if (typeof window !== 'undefined') window.open('/display/timer', 'TimerDisplay', 'noopener,noreferrer,width=900,height=700'); }}
-            className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
-            title="Open Timer Display"
-            aria-label="Open Timer Display"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="text-center mb-6">
-          <div className="text-5xl md:text-7xl xl:text-8xl font-mono font-bold text-white mb-4 tracking-wider">
-            {formatHMS(currentSeconds)}
-          </div>
-          <div className="flex gap-4 justify-center mb-4">
-            <button
-              onClick={handleStartStop}
-              className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
-            >
-              {isRunning ? 'Stop' : 'Start'}
-            </button>
-            
-            <button
-              onClick={handleReset}
-              className="px-6 py-3 text-xl font-semibold rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white min-w-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 ring-offset-gray-800"
-            >
-              Reset
-            </button>
-          </div>
-          <form onSubmit={handleManualSubmit} className="flex gap-2 justify-center">
-            <input
-              type="text"
-              placeholder="HH:MM:SS"
-              value={manualTime}
-              onChange={(e) => setManualTime(e.target.value)}
-              className="px-3 py-2 bg-gray-700 text-white rounded font-mono text-center w-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
-            >
-              Set
-            </button>
-          </form>
-        </div>
-      </div>
-    )
-  }
-
-
-  // Editable field component
-  const EditableField = ({ 
-    inject, 
-    field, 
-    value, 
-    displayValue, 
-    isSelect = false, 
-    selectOptions = [] 
-  }: {
-    inject: InjectItem
-    field: string
-    value: string | number
-    displayValue?: string
-    isSelect?: boolean
-    selectOptions?: string[]
-  }) => {
-    const isEditing = editingField?.id === inject.id && editingField?.field === field
-    
-    if (isEditing) {
-      if (isSelect) {
-        return (
-          <select
-            value={editingValue}
-            onChange={(e) => setEditingValue(e.target.value)}
-            onBlur={handleSaveEdit}
-            onKeyDown={handleKeyPress}
-            className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-500"
-            autoFocus
-          >
-            {selectOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        )
-      }
-      
-      return (
-        <input
-          type="text"
-          value={editingValue}
-          onChange={(e) => setEditingValue(e.target.value)}
-          onBlur={handleSaveEdit}
-          onKeyDown={handleKeyPress}
-          className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-500"
-          autoFocus
-        />
-      )
-    }
-    
-    const onKey = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        handleStartEdit(inject.id, field, value)
-      }
-    }
-    const fieldLabel: Record<string, string> = {
-      number: 'number', dueTime: 'due time', title: 'title', type: 'type', to: 'to', from: 'from'
-    }
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => handleStartEdit(inject.id, field, value)}
-        onKeyDown={onKey}
-        className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 px-2 py-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
-        title="Click to edit"
-        aria-label={`Edit ${fieldLabel[field] || field} for inject #${inject.number}`}
-      >
-        {displayValue || value}
-      </div>
-    )
-  }
-
-  const InjectList = () => {
-    return (
-      <div className="bg-gray-800 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-2xl font-bold text-white">Inject Status</h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={exportInjectsImportCSV}
-              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
-              title="Export Injects (Import CSV)"
-              aria-label="Export Injects (Import CSV)"
-            >
-              <FileDown className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setAudioEnabled(v => !v)}
-              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
-              title={audioEnabled ? 'Mute alerts' : 'Unmute alerts'}
-              aria-pressed={audioEnabled}
-              aria-label={audioEnabled ? 'Mute audio alerts' : 'Unmute audio alerts'}
-            >
-              {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full" aria-label="Injects table">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white w-10">#</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white w-28">Due</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white hidden md:table-cell w-28">From</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white hidden md:table-cell w-28">To</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white">Title</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white w-12">Type</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white w-24">Status</th>
-                <th className="px-2 py-3 text-left text-sm font-semibold text-white w-56">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...injects].sort((a, b) => a.dueSeconds - b.dueSeconds).map((inject, sortedIndex) => (
-                <tr 
-                  key={inject.id} 
-                  className={`border-t border-gray-600 ${
-                    isCurrentInject(inject) ? 'bg-yellow-900 bg-opacity-30' : ''
-                  } ${inject.status === 'skipped' ? 'opacity-60' : ''}`}
-                >
-                  <td className="px-4 py-3 text-sm font-mono text-white font-semibold">
-                    <EditableField
-                      inject={inject}
-                      field="number"
-                      value={inject.number}
-                      displayValue={`#${inject.number}`}
-                    />
-                  </td>
-                  <td className="px-2 py-3 text-sm font-mono text-white">
-                    <EditableField
-                      inject={inject}
-                      field="dueTime"
-                      value={formatHMS(inject.dueSeconds)}
-                      displayValue={formatHMS(inject.dueSeconds)}
-                    />
-                  </td>
-                  <td className="px-2 py-3 text-sm text-white hidden md:table-cell">
-                    <EditableField
-                      inject={inject}
-                      field="from"
-                      value={inject.from || ''}
-                      displayValue={inject.from || '-'}
-                    />
-                  </td>
-                  <td className="px-2 py-3 text-sm text-white hidden md:table-cell">
-                    <EditableField
-                      inject={inject}
-                      field="to"
-                      value={inject.to || ''}
-                      displayValue={inject.to || '-'}
-                    />
-                  </td>
-                  <td className={`px-2 py-3 text-sm text-white ${inject.status === 'skipped' ? 'line-through' : ''}`}>
-                    <EditableField
-                      inject={inject}
-                      field="title"
-                      value={inject.title}
-                      displayValue={inject.title}
-                    />
-                  </td>
-                  <td className="px-2 py-3">
-                    {editingField?.id === inject.id && editingField?.field === 'type' ? (
-                      <select
-                        value={editingValue}
-                        onChange={(e) => setEditingValue(e.target.value)}
-                        onBlur={handleSaveEdit}
-                        onKeyDown={handleKeyPress}
-                        className="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-500"
-                        autoFocus
-                      >
-                        <option value="in person">in person</option>
-                        <option value="radio/phone">radio/phone</option>
-                        <option value="electronic">electronic</option>
-                        <option value="map inject">map inject</option>
-                        <option value="other">other</option>
-                      </select>
-                    ) : (
-                      <div
-                        onClick={() => handleStartEdit(inject.id, 'type', inject.type)}
-                        className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 px-2 py-1 rounded transition-colors inline-flex items-center justify-center"
-                        title="Click to edit"
-                      >
-                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${getInjectTypeTextColor(inject.type)}`}>
-                          {getInjectTypeIcon(inject.type)}
-                        </span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-2 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getInjectStatusColor(inject.status)}`}>
-                      {inject.status}
-                    </span>
-                  </td>
-                  <td className="px-2 py-3">
-                    <div className="flex gap-1">
-                      {/* Done / Undo */}
-                      <button
-                        onClick={() => handleToggleInjectStatus(inject.id)}
-                        disabled={!canEdit || inject.status === 'skipped'}
-                        className={`p-1 rounded text-white disabled:opacity-50 ${focusRing} ${
-                          inject.status === 'completed' 
-                            ? 'bg-orange-600 hover:bg-orange-700' 
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                        title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
-                        aria-label={inject.status === 'completed' ? `Mark inject #${inject.number} incomplete` : `Mark inject #${inject.number} complete`}
-                      >
-                        {inject.status === 'completed' ? <RotateCcw className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-                      </button>
-                      {/* Skip */}
-                      <button
-                        onClick={() => handleSkipInject(inject.id)}
-                        disabled={!canEdit || inject.status === 'skipped' || inject.status === 'completed'}
-                        className={`p-1 rounded bg-orange-600 hover:bg-orange-700 text-white disabled:bg-gray-600 disabled:opacity-50 ${focusRing}`}
-                        title="Skip inject"
-                        aria-label={`Skip inject #${inject.number}`}
-                      >
-                        <Slash className="w-4 h-4" />
-                      </button>
-                      {/* Play audio */}
-                      {inject.audioDataUrl && (
-                        <button
-                          onClick={() => handlePlayInjectAudio(inject.id)}
-                          className={`p-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white ${focusRing}`}
-                          title="Play attached audio"
-                          aria-label={`Play audio for inject #${inject.number}`}
-                        >
-                          <PlayIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                      {/* Move Up/Down */}
-                      <button
-                        onClick={() => handleMoveInject(inject.id, 'up')}
-                        disabled={!canEdit || sortedIndex === 0}
-                        className={`p-1 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white ${focusRing}`}
-                        title="Move up"
-                        aria-label={`Move inject #${inject.number} up`}
-                      >
-                        <ArrowUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleMoveInject(inject.id, 'down')}
-                        disabled={!canEdit || sortedIndex === injects.length - 1}
-                        className={`p-1 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white ${focusRing}`}
-                        title="Move down"
-                        aria-label={`Move inject #${inject.number} down`}
-                      >
-                        <ArrowDown className="w-4 h-4" />
-                      </button>
-                      {/* Delete */}
-                      <button
-                        onClick={() => handleDeleteInject(inject.id)}
-                        className={`p-1 rounded bg-red-600 hover:bg-red-700 text-white ${focusRing}`}
-                        disabled={!canEdit}
-                        title="Delete inject"
-                        aria-label={`Delete inject #${inject.number}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
-
-  const ResourceRequestBoard = () => {
-    const [editingResource, setEditingResource] = useState<string | null>(null)
-    const [editETA, setEditETA] = useState('')
-
-    const handleStartEdit = (resource: ResourceItem) => {
-      setEditingResource(resource.id)
-      setEditETA(formatHMS(resource.etaSeconds))
-    }
-
-    const handleSaveEdit = (resourceId: string) => {
-      handleResourceETAEdit(resourceId, editETA)
-      setEditingResource(null)
-      setEditETA('')
-    }
-
-    const handleCancelEdit = () => {
-      setEditingResource(null)
-      setEditETA('')
-    }
-
-    return (
-      <div className="bg-gray-800 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-2xl font-bold text-white">Resource Requests</h3>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input type="checkbox" checked={autoAdvanceResources} onChange={(e)=>setAutoAdvanceResources(e.target.checked)} />
-              Auto-advance
-            </label>
-            <button
-              onClick={() => {
-                // Import-ready CSV: minutes instead of absolute seconds
-                const rows: (string|number)[][] = []
-                rows.push(['Label','Kind','ETA (minutes)','Status'])
-                const sorted = [...resources].sort((a,b) => a.etaSeconds - b.etaSeconds)
-                sorted.forEach(r => {
-                  const minutes = Math.max(0, Math.round((r.etaSeconds - currentSeconds) / 60))
-                  rows.push([r.label, r.kind || '', minutes, r.status])
-                })
-                const name = exerciseName?.trim() ? `_${exerciseName.trim().replace(/\s+/g,'_')}` : ''
-                downloadCSV(`resources_import${name}.csv`, rows)
-              }}
-              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
-              title="Export Resources (Import CSV)"
-              aria-label="Export Resources (Import CSV)"
-            >
-              <FileDown className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => { if (typeof window !== 'undefined') window.open('/display/resources', 'ResourcesDisplay', 'noopener,noreferrer,width=1200,height=800'); }}
-              className="p-2 rounded bg-gray-700 hover:bg-gray-600 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ring-offset-gray-800"
-              title="Open Resources Display"
-              aria-label="Open Resources Display"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full" aria-label="Resource requests table">
-            <thead className="bg-gray-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Label</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-white">ETA</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resources.map((resource) => (
-                <tr key={resource.id} className="border-t border-gray-600">
-                  <td className="px-4 py-3 text-sm text-white">
-                    <span className="inline-flex items-center gap-2">
-                      {getResourceStatusIcon(resource.status)}
-                      {resource.kind && <span className="opacity-80">{getResourceKindIcon(resource.kind)}</span>}
-                      <span>{resource.label}</span>
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-mono text-white">
-                    {editingResource === resource.id ? (
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={editETA}
-                          onChange={(e) => setEditETA(e.target.value)}
-                          className="px-2 py-1 bg-gray-700 text-white rounded text-xs font-mono w-20"
-                          placeholder="HH:MM:SS"
-                        />
-                        <button
-                          onClick={() => handleSaveEdit(resource.id)}
-                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <span
-                        className={`cursor-pointer ${canEdit ? 'hover:text-blue-400' : 'text-gray-400 cursor-not-allowed'}`}
-                        onClick={() => { if (canEdit) handleStartEdit(resource) }}
-                        title={canEdit ? "Click to edit ETA" : "Editing locked"}
-                      >
-                        {formatHMS(resource.etaSeconds)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getResourceStatusColor(resource.status)}`}>
-                      {resource.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 flex-wrap">
-                      {resource.status === "requested" && (
-                        <button
-                          onClick={() => handleResourceStatusChange(resource.id, "tasked")}
-                          className="px-2 py-1 text-xs bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 text-white rounded"
-                          disabled={!canEdit}
-                        >
-                          Task
-                        </button>
-                      )}
-                      {resource.status === "tasked" && (
-                        <button
-                          onClick={() => handleResourceStatusChange(resource.id, "enroute")}
-                          className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded"
-                          disabled={!canEdit}
-                        >
-                          Dispatch
-                        </button>
-                      )}
-                      {resource.status === "enroute" && (
-                        <button
-                          onClick={() => handleResourceStatusChange(resource.id, "arrived")}
-                          className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded"
-                          disabled={!canEdit}
-                        >
-                          Arrive
-                        </button>
-                      )}
-                      {!isTerminalStatus(resource.status) && (
-                        <button
-                          onClick={() => handleResourceStatusChange(resource.id, "cancelled")}
-                          className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white rounded"
-                          disabled={!canEdit}
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {resources.length === 0 && (
-            <div className="text-center py-8 text-gray-400">No resources added yet</div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   // Main render
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
@@ -1367,63 +548,19 @@ const getInjectTypeTextColor = (type: InjectType): string => {
         <TimerControls />
 
         {/* Resources full width under timer */}
-        <ResourceRequestBoard />
+        <ResourceRequestBoard
+          canEdit={canEdit}
+          autoAdvanceResources={autoAdvanceResources}
+          onToggleAutoAdvance={setAutoAdvanceResources}
+        />
 
-        {/* Timeline filters above status lists */}
-        <div className="space-y-4">
-
-          <TimelineFilterBar
-            showInjects={showInjects}
-            setShowInjects={setShowInjects}
-            showResources={showResources}
-            setShowResources={setShowResources}
-            showInPerson={showInPerson}
-            setShowInPerson={setShowInPerson}
-            showRadioPhone={showRadioPhone}
-            setShowRadioPhone={setShowRadioPhone}
-            showElectronic={showElectronic}
-            setShowElectronic={setShowElectronic}
-            showMapInject={showMapInject}
-            setShowMapInject={setShowMapInject}
-            showOther={showOther}
-            setShowOther={setShowOther}
-            showRequestedStatus={showRequestedStatus}
-            setShowRequestedStatus={setShowRequestedStatus}
-            showTaskedStatus={showTaskedStatus}
-            setShowTaskedStatus={setShowTaskedStatus}
-            showEnrouteStatus={showEnrouteStatus}
-            setShowEnrouteStatus={setShowEnrouteStatus}
-            showArrivedStatus={showArrivedStatus}
-            setShowArrivedStatus={setShowArrivedStatus}
-            showCancelledStatus={showCancelledStatus}
-            setShowCancelledStatus={setShowCancelledStatus}
-          />
-          
-          {showInjects && (
-            <Timeline
-              currentSeconds={currentSeconds}
-              finishSeconds={(typeof exerciseFinishTime === 'string' && exerciseFinishTime) ? (parseHMS(exerciseFinishTime) ?? undefined) : undefined}
-              injects={injects.filter((i) => {
-                if (i.type === 'in person' && !showInPerson) return false
-                if (i.type === 'radio/phone' && !showRadioPhone) return false
-                if (i.type === 'electronic' && !showElectronic) return false
-                if (i.type === 'map inject' && !showMapInject) return false
-                if (i.type === 'other' && !showOther) return false
-                return true
-              })}
-              resources={resources.filter((r) => {
-                if (r.status === 'requested' && !showRequestedStatus) return false
-                if (r.status === 'tasked' && !showTaskedStatus) return false
-                if (r.status === 'enroute' && !showEnrouteStatus) return false
-                if (r.status === 'arrived' && !showArrivedStatus) return false
-                if (r.status === 'cancelled' && !showCancelledStatus) return false
-                return true
-              })}
-            />
-
-          )}
-          {showInjects && <InjectList />}
-        </div>
+        {/* Timeline and Inject list */}
+        <DashboardTimeline
+          canEdit={canEdit}
+          audioEnabled={audioEnabled}
+          onToggleAudio={() => setAudioEnabled(v => !v)}
+          onExportInjects={exportInjectsImportCSV}
+        />
 
         {/* Forms at bottom to leave space for status lists */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
