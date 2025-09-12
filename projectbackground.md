@@ -133,9 +133,19 @@ The dashboard is designed around the **Australian Institute for Disaster Resilie
 - **Flexibility**: Adaptable to different emergency types and scenarios
 - **Innovation**: Modern web platform brings emergency training into the digital age
 
-## Future Vision
+## Development Approach
 
-The EXCON Dashboard represents the foundation for a comprehensive emergency exercise ecosystem. Future development will expand capabilities while maintaining the core focus on practical, effective emergency management training that saves lives and protects communities.
+The EXCON Dashboard follows a **reliability-first** development philosophy. Rather than pursuing complex features, the focus is on making the core emergency exercise functionality completely dependable for critical training exercises.
+
+### Phase 2 Core System Focus
+- **Exercise Persistence**: Save/load exercises for reuse and operational continuity
+- **Field Operations**: Tablet/mobile optimization for exercise controllers working in field conditions  
+- **AIDR Alignment**: Templates, reports, and workflows that match established emergency management standards
+- **Production Quality**: Testing, logging, and error handling suitable for professional emergency management use
+- **Operational Reliability**: System that emergency professionals can depend on during critical training exercises
+
+### Future Considerations
+Additional features will only be pursued after the core system demonstrates complete reliability in real-world emergency exercise operations. Any future expansion will maintain the focus on practical, effective emergency management training that supports community preparedness and response capabilities.
 
 ---
 

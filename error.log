@@ -1,0 +1,9 @@
+# EXCON Dashboard Error Log
+# Format: [TIMESTAMP] [LEVEL] [COMPONENT] Message
+# Levels: ERROR, WARN, INFO
+# 
+# This file tracks all errors and issues for future fixing and system improvement.
+# Errors are automatically logged by the application and can also be manually added.
+#
+# Started: 2025-01-12
+#
