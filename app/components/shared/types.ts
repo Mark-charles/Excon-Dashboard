@@ -1,6 +1,7 @@
 export type InjectType = "in person" | "radio/phone" | "electronic" | "map inject" | "other"
 export type InjectStatus = "pending" | "completed" | "missed" | "skipped"
 export type ResourceStatus = "requested" | "tasked" | "enroute" | "arrived" | "cancelled"
+export type ResourceKind = "truck" | "ambulance" | "helicopter" | "police" | "fire" | "medical" | "other" | "unknown"
 
 export interface InjectItem {
   id: string
@@ -18,6 +19,7 @@ export interface ResourceItem {
   label: string
   etaSeconds: number
   status: ResourceStatus
+  kind?: ResourceKind
 }
 
 export interface ExerciseInfo {

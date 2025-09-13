@@ -8,7 +8,6 @@ import { getInjectStatusColor, getInjectTypeColor } from '../../utils/styleUtils
 interface InjectListProps {
   injects: InjectItem[]
   currentSeconds: number
-  editingState: EditingState
   onUpdateInjects: (updatedInjects: InjectItem[]) => void
   onToggleInjectStatus: (injectId: string) => void
   onMoveInject: (id: string, direction: 'up' | 'down') => void
@@ -26,7 +25,6 @@ interface EditableFieldProps {
   editingState: EditingState
   onStartEdit: (id: string, field: string, currentValue: string | number) => void
   onSaveEdit: () => void
-  onCancelEdit: () => void
   onEditingValueChange: (value: string) => void
   onKeyPress: (e: React.KeyboardEvent) => void
 }
@@ -41,7 +39,6 @@ const EditableField: React.FC<EditableFieldProps> = ({
   editingState,
   onStartEdit,
   onSaveEdit,
-  onCancelEdit,
   onEditingValueChange,
   onKeyPress
 }) => {
@@ -92,7 +89,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
 const InjectList: React.FC<InjectListProps> = ({
   injects,
   currentSeconds,
-  editingState,
+  
   onUpdateInjects,
   onToggleInjectStatus,
   onMoveInject,
@@ -299,16 +296,16 @@ const InjectList: React.FC<InjectListProps> = ({
                     <button
                       onClick={() => onMoveInject(inject.id, 'up')}
                       disabled={sortedIndex === 0}
-                      className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
-                      title="Move up"
+                      className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded icon-btn"
+                      title="Move up" aria-label="Move up" data-label="^"
                     >
                       ↑
                     </button>
                     <button
                       onClick={() => onMoveInject(inject.id, 'down')}
                       disabled={sortedIndex === injects.length - 1}
-                      className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
-                      title="Move down"
+                      className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded icon-btn"
+                      title="Move down" aria-label="Move down" data-label="v"
                     >
                       ↓
                     </button>
@@ -317,12 +314,14 @@ const InjectList: React.FC<InjectListProps> = ({
                     <button
                       onClick={() => onToggleInjectStatus(inject.id)}
                       disabled={inject.status === 'skipped'}
-                      className={`px-2 py-1 text-xs font-semibold rounded transition-colors disabled:opacity-50 ${
+                      className={`px-2 py-1 text-xs font-semibold rounded transition-colors disabled:opacity-50 icon-btn ${
                         inject.status === 'completed' 
                           ? 'bg-orange-600 hover:bg-orange-700 text-white' 
                           : 'bg-green-600 hover:bg-green-700 text-white'
                       }`}
                       title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
+                      aria-label={inject.status === 'completed' ? 'Undo complete' : 'Mark complete'}
+                      data-label={inject.status === 'completed' ? 'Undo' : 'Done'}
                     >
                       {inject.status === 'completed' ? '↶' : '✓'}
                     </button>
@@ -331,8 +330,8 @@ const InjectList: React.FC<InjectListProps> = ({
                     <button
                       onClick={() => onSkipInject(inject.id)}
                       disabled={inject.status === 'skipped' || inject.status === 'completed'}
-                      className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded"
-                      title="Skip inject"
+                      className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded icon-btn"
+                      title="Skip inject" aria-label="Skip inject" data-label="Skip"
                     >
                       ⊘
                     </button>
@@ -340,8 +339,8 @@ const InjectList: React.FC<InjectListProps> = ({
                     {/* Delete */}
                     <button
                       onClick={() => onDeleteInject(inject.id)}
-                      className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
-                      title="Delete inject"
+                      className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded icon-btn"
+                      title="Delete inject" aria-label="Delete inject" data-label="Del"
                     >
                       🗑
                     </button>

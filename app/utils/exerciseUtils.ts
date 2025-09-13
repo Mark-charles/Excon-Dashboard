@@ -1,5 +1,5 @@
 // Exercise management utilities for save/load and templates
-import type { InjectItem, ResourceItem, ExerciseInfo } from '../components/shared/types'
+import type { InjectItem, ResourceItem } from '../components/shared/types'
 import { logTaskCompleted, logError, logInfo } from './loggingUtils'
 
 export interface ExerciseData {

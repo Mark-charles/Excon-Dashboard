@@ -8,7 +8,7 @@ interface TimerControlsProps {
   isRunning: boolean
   onStartStop: () => void
   onReset: () => void
-  onManualTimeSet: (timeInput: string) => void
+  onManualTimeSet: (timeInput: string) => boolean
 }
 
 const TimerControls: React.FC<TimerControlsProps> = ({
@@ -19,12 +19,18 @@ const TimerControls: React.FC<TimerControlsProps> = ({
   onManualTimeSet
 }) => {
   const [manualTime, setManualTime] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (manualTime.trim()) {
-      onManualTimeSet(manualTime.trim())
-      setManualTime('')
+      const ok = onManualTimeSet(manualTime.trim())
+      if (ok) {
+        setManualTime('')
+        setError(null)
+      } else {
+        setError('Invalid time. Use HH:MM:SS (e.g., 01:05:30).')
+      }
     }
   }
 
@@ -51,7 +57,7 @@ const TimerControls: React.FC<TimerControlsProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleManualSubmit} className="flex gap-2 justify-center">
+        <form onSubmit={handleManualSubmit} className="flex flex-col gap-2 items-center justify-center">
           <input
             type="text"
             placeholder="HH:MM:SS"
@@ -65,6 +71,9 @@ const TimerControls: React.FC<TimerControlsProps> = ({
           >
             Set
           </button>
+          {error && (
+            <div className="text-red-400 text-sm" role="alert" aria-live="polite">{error}</div>
+          )}
         </form>
       </div>
     </div>

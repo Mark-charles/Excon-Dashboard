@@ -1,9 +1,10 @@
-'use client'
+﻿'use client'
 
-import React from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import type { InjectItem, ResourceItem, FilterState } from '../shared/types'
 import { formatHMS, parseHMS } from '../../utils/timeUtils'
-import { getInjectTypeEmoji, getInjectTypeTextColor, getResourceStatusEmoji, getResourceStatusTextColor } from '../../utils/styleUtils'
+import { getInjectTypeTextColor, getResourceStatusTextColor, getResourceStatusRingClass } from '../../utils/styleUtils'
+import { getInjectTypeGlyph, getResourceStatusGlyph, getResourceTypeGlyph } from '../../utils/iconHelpers'
 
 interface TimelineProps {
   injects: InjectItem[]
@@ -26,8 +27,22 @@ const Timeline: React.FC<TimelineProps> = ({
   exerciseFinishTime,
   filterState
 }) => {
+  // Measure container width for responsive timeline
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [timelineWidth, setTimelineWidth] = useState<number>(1000)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = () => setTimelineWidth(Math.max(600, el.clientWidth))
+    update()
+    const ro = new ResizeObserver(() => update())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Filter items based on current filter state
-  const filteredInjects = injects.filter(inject => {
+  const filteredInjects = useMemo(() => injects.filter(inject => {
     if (!filterState.showInjects) return false
     if (inject.type === 'in person' && !filterState.showInPerson) return false
     if (inject.type === 'radio/phone' && !filterState.showRadioPhone) return false
@@ -35,9 +50,9 @@ const Timeline: React.FC<TimelineProps> = ({
     if (inject.type === 'map inject' && !filterState.showMapInject) return false
     if (inject.type === 'other' && !filterState.showOther) return false
     return true
-  })
+  }), [injects, filterState])
 
-  const filteredResources = resources.filter(resource => {
+  const filteredResources = useMemo(() => resources.filter(resource => {
     if (!filterState.showResources) return false
     if (resource.status === 'requested' && !filterState.showRequestedStatus) return false
     if (resource.status === 'tasked' && !filterState.showTaskedStatus) return false
@@ -45,7 +60,7 @@ const Timeline: React.FC<TimelineProps> = ({
     if (resource.status === 'arrived' && !filterState.showArrivedStatus) return false
     if (resource.status === 'cancelled' && !filterState.showCancelledStatus) return false
     return true
-  })
+  }), [resources, filterState])
 
   // Determine the end time based on exercise finish time or fallback to max content time
   const finishTimeSeconds = exerciseFinishTime && parseHMS(exerciseFinishTime) !== null ? parseHMS(exerciseFinishTime)! : 0
@@ -60,11 +75,9 @@ const Timeline: React.FC<TimelineProps> = ({
     ? finishTimeSeconds 
     : Math.max(maxContentSeconds + 1800, 3600) // +30 min buffer, min 1 hour
   
-  // Timeline fills full container width (responsive)
-  const timelineWidth = 1000 // Wider to accommodate many injects
-  const getTimelinePosition = (seconds: number): number => {
+  const getTimelinePosition = useCallback((seconds: number): number => {
     return (seconds / timelineEndSeconds) * (timelineWidth - 32) + 16 // Account for padding
-  }
+  }, [timelineEndSeconds, timelineWidth])
   
   // Get the end position for the red line
   const getEndPosition = (): number => {
@@ -78,26 +91,33 @@ const Timeline: React.FC<TimelineProps> = ({
     const totalMinutes = timelineEndSeconds / 60
     let intervalMinutes: number
     
-    // Much finer granular scaling
-    if (totalMinutes <= 15) intervalMinutes = 2 // Every 2 minutes for very short exercises
-    else if (totalMinutes <= 30) intervalMinutes = 5 // Every 5 minutes for 30 min exercises
-    else if (totalMinutes <= 60) intervalMinutes = 5 // Every 5 minutes for 1 hour exercises
-    else if (totalMinutes <= 120) intervalMinutes = 10 // Every 10 minutes for 2 hour exercises  
-    else if (totalMinutes <= 240) intervalMinutes = 15 // Every 15 minutes for 4 hour exercises
-    else if (totalMinutes <= 480) intervalMinutes = 30 // Every 30 minutes for 8 hour exercises
-    else intervalMinutes = 60 // Every hour for very long exercises
+    // Choose interval minutes dynamically based on duration and width to reduce label overlap
+    const approxLabels = Math.max(4, Math.floor(timelineWidth / 100))
+    if (totalMinutes <= 15) intervalMinutes = 2
+    else if (totalMinutes <= 30) intervalMinutes = 5
+    else if (totalMinutes <= 60) intervalMinutes = 5
+    else if (totalMinutes <= 120) intervalMinutes = 10
+    else if (totalMinutes <= 240) intervalMinutes = 15
+    else if (totalMinutes <= 480) intervalMinutes = 30
+    else intervalMinutes = 60
 
     const intervals = []
     for (let minutes = 0; minutes <= totalMinutes; minutes += intervalMinutes) {
       intervals.push(minutes * 60) // Convert back to seconds
     }
+    // Downsample if too many labels for width
+    const maxLabels = approxLabels
+    if (intervals.length > maxLabels && maxLabels > 0) {
+      const step = Math.ceil(intervals.length / maxLabels)
+      return intervals.filter((_, idx) => idx % step === 0)
+    }
     return intervals
   }
 
-  const timeIntervals = getTimeIntervals()
+  const timeIntervals = useMemo(getTimeIntervals, [timelineEndSeconds, timelineWidth])
 
   // Smart inject stacking - group injects that are close together
-  const stackInjects = (items: (InjectItem | ResourceItem)[]): TimelineStack[] => {
+  const stackInjects = useCallback((items: (InjectItem | ResourceItem)[]): TimelineStack[] => {
     const stackedItems: TimelineStack[] = []
     
     const sortedItems = [...items].sort((a, b) => {
@@ -129,23 +149,25 @@ const Timeline: React.FC<TimelineProps> = ({
     })
 
     return stackedItems
-  }
+  }, [timelineWidth, getTimelinePosition])
 
   // Combine and stack all items
-  const allItems = [...filteredInjects, ...filteredResources]
-  const stackedItems = stackInjects(allItems)
+  const stackedItems = useMemo(
+    () => stackInjects([...filteredInjects, ...filteredResources]),
+    [filteredInjects, filteredResources, stackInjects]
+  )
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6">
+    <div className="bg-gray-800 rounded-lg p-6" ref={containerRef}>
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-2xl font-bold text-white">Timeline</h3>
         <div className="flex gap-4 text-sm flex-wrap">
-          <span className="text-blue-400">👤 In Person</span>
-          <span className="text-green-400">📞 Radio/Phone</span>
-          <span className="text-purple-400">💻 Electronic</span>
-          <span className="text-red-400">🗺️ Map Inject</span>
-          <span className="text-orange-400">❓ Other</span>
-          <span className="text-gray-400">🚛 Resources</span>
+          <span className="text-blue-400 flex items-center gap-1">{getInjectTypeGlyph('in person')} In Person</span>
+          <span className="text-green-400 flex items-center gap-1">{getInjectTypeGlyph('radio/phone')} Radio/Phone</span>
+          <span className="text-purple-400 flex items-center gap-1">{getInjectTypeGlyph('electronic')} Electronic</span>
+          <span className="text-red-400 flex items-center gap-1">{getInjectTypeGlyph('map inject')} Map Inject</span>
+          <span className="text-orange-400 flex items-center gap-1">{getInjectTypeGlyph('other')} Other</span>
+          <span className="text-gray-400 flex items-center gap-1">{getResourceStatusGlyph('requested')} Resources</span>
         </div>
       </div>
       
@@ -199,10 +221,17 @@ const Timeline: React.FC<TimelineProps> = ({
                     title={'dueSeconds' in stack.items[0] 
                       ? `#${stack.items[0].number} ${stack.items[0].title} - ${formatHMS(stack.items[0].dueSeconds)} (${stack.items[0].type}) - To: ${stack.items[0].to || 'N/A'} From: ${stack.items[0].from || 'N/A'} (${stack.items[0].status})`
                       : `${stack.items[0].label} - ETA: ${formatHMS(stack.items[0].etaSeconds)} (${stack.items[0].status})`}
+                    aria-label={'dueSeconds' in stack.items[0] 
+                      ? `#${stack.items[0].number} ${stack.items[0].title} - ${formatHMS(stack.items[0].dueSeconds)} (${stack.items[0].type}) - To: ${stack.items[0].to || 'N/A'} From: ${stack.items[0].from || 'N/A'} (${stack.items[0].status})`
+                      : `${stack.items[0].label} - ETA: ${formatHMS(stack.items[0].etaSeconds)} (${stack.items[0].status})`}
                   >
-                    {'dueSeconds' in stack.items[0] 
-                      ? getInjectTypeEmoji(stack.items[0].type)
-                      : getResourceStatusEmoji(stack.items[0].status)}
+                    {'dueSeconds' in stack.items[0]
+                      ? getInjectTypeGlyph(stack.items[0].type)
+                      : (
+                        <span className={`icon-wrap ring-2 ${getResourceStatusRingClass(stack.items[0].status)} ring-offset-2 ring-offset-gray-900`}>
+                          {getResourceTypeGlyph(stack.items[0])}
+                        </span>
+                      )}
                   </div>
                 ) : (
                   // Stacked items
@@ -219,10 +248,17 @@ const Timeline: React.FC<TimelineProps> = ({
                         title={'dueSeconds' in item 
                           ? `#${item.number} ${item.title} - ${formatHMS(item.dueSeconds)} (${item.type}) - To: ${item.to || 'N/A'} From: ${item.from || 'N/A'} (${item.status})`
                           : `${item.label} - ETA: ${formatHMS(item.etaSeconds)} (${item.status})`}
+                        aria-label={'dueSeconds' in item 
+                          ? `#${item.number} ${item.title} - ${formatHMS(item.dueSeconds)} (${item.type}) - To: ${item.to || 'N/A'} From: ${item.from || 'N/A'} (${item.status})`
+                          : `${item.label} - ETA: ${formatHMS(item.etaSeconds)} (${item.status})`}
                       >
-                        {'dueSeconds' in item 
-                          ? getInjectTypeEmoji(item.type)
-                          : getResourceStatusEmoji(item.status)}
+                        {'dueSeconds' in item
+                          ? getInjectTypeGlyph(item.type)
+                          : (
+                            <span className={`icon-wrap ring-2 ${getResourceStatusRingClass(item.status)} ring-offset-2 ring-offset-gray-900`}>
+                              {getResourceTypeGlyph(item)}
+                            </span>
+                          )}
                       </div>
                     ))}
                     {/* Stack indicator */}
@@ -254,3 +290,4 @@ const Timeline: React.FC<TimelineProps> = ({
 }
 
 export default Timeline
+

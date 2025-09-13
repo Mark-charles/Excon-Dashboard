@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { InjectItem, ImportModalState } from '../shared/types'
+import type { InjectItem } from '../shared/types'
 import { formatHMS } from '../../utils/timeUtils'
 import { getInjectTypeColor } from '../../utils/styleUtils'
 import { downloadInjectsTemplate, processInjectsFile } from '../../utils/importExportUtils'

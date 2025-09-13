@@ -152,7 +152,11 @@ export const logTaskPlanned = (description: string, details?: string) =>
   logger.logTask('PLANNED', description, details)
 
 // Error boundary integration
-export const handleComponentError = (component: string, error: Error, errorInfo?: any) => {
+export const handleComponentError = (
+  component: string,
+  error: Error,
+  errorInfo?: { componentStack?: string }
+) => {
   logError(component, `Component error: ${error.message}`, error)
   if (errorInfo?.componentStack) {
     logError(component, `Component stack: ${errorInfo.componentStack}`)

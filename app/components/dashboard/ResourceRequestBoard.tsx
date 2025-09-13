@@ -3,13 +3,14 @@
 import React, { useState } from 'react'
 import type { ResourceItem, ResourceStatus } from '../shared/types'
 import { formatHMS } from '../../utils/timeUtils'
-import { getResourceStatusColor } from '../../utils/styleUtils'
+import { getResourceStatusColor, getResourceStatusRingClass } from '../../utils/styleUtils'
+import { getResourceTypeGlyph } from '../../utils/iconHelpers'
 import { isTerminalStatus } from '../../utils/validation'
 
 interface ResourceRequestBoardProps {
   resources: ResourceItem[]
   onResourceStatusChange: (resourceId: string, newStatus: ResourceStatus) => void
-  onResourceETAEdit: (resourceId: string, newETATime: string) => void
+  onResourceETAEdit: (resourceId: string, newETATime: string) => boolean
 }
 
 const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
@@ -19,6 +20,7 @@ const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
 }) => {
   const [editingResource, setEditingResource] = useState<string | null>(null)
   const [editETA, setEditETA] = useState('')
+  const [etaError, setEtaError] = useState<string | null>(null)
 
   const handleStartEdit = (resource: ResourceItem) => {
     setEditingResource(resource.id)
@@ -26,9 +28,14 @@ const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
   }
 
   const handleSaveEdit = (resourceId: string) => {
-    onResourceETAEdit(resourceId, editETA)
-    setEditingResource(null)
-    setEditETA('')
+    const ok = onResourceETAEdit(resourceId, editETA)
+    if (ok) {
+      setEditingResource(null)
+      setEditETA('')
+      setEtaError(null)
+    } else {
+      setEtaError('Invalid time. Use HH:MM:SS (e.g., 00:45:00).')
+    }
   }
 
   const handleCancelEdit = () => {
@@ -52,7 +59,12 @@ const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
           <tbody>
             {resources.map((resource) => (
               <tr key={resource.id} className="border-t border-gray-600">
-                <td className="px-4 py-3 text-sm text-white">{resource.label}</td>
+                <td className="px-4 py-3 text-sm text-white">
+                  <span className={`icon-wrap ring-2 ${getResourceStatusRingClass(resource.status)} ring-offset-2 ring-offset-gray-900 mr-2`}>
+                    {getResourceTypeGlyph(resource)}
+                  </span>
+                  {resource.label}
+                </td>
                 <td className="px-4 py-3 text-sm font-mono text-white">
                   {editingResource === resource.id ? (
                     <div className="flex gap-2 items-center">
@@ -75,6 +87,9 @@ const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
                       >
                         Cancel
                       </button>
+                      {etaError && (
+                        <span className="text-red-400 text-xs ml-2" role="alert">{etaError}</span>
+                      )}
                     </div>
                   ) : (
                     <span

@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import type { InjectItem, ResourceItem, FilterState } from '../components/shared/types'
-import { parseHMS, formatHMS } from '../utils/timeUtils'
+import { parseHMS } from '../utils/timeUtils'
 import { generateId, canTransitionTo } from '../utils/validation'
+import { logWarn, logger } from '../utils/loggingUtils'
 
 // Import extracted components
 import ExerciseHeader from '../components/exercise/ExerciseHeader'
@@ -31,6 +32,16 @@ export default function Dashboard() {
   const [isRunning, setIsRunning] = useState(false)
   const [injects, setInjects] = useState<InjectItem[]>(initialInjects)
   const [resources, setResources] = useState<ResourceItem[]>([])
+  // Persistence / restore state
+  const [pendingRestore, setPendingRestore] = useState<null | {
+    exerciseName: string
+    controllerName: string
+    exerciseFinishTime: string
+    currentSeconds: number
+    injects: InjectItem[]
+    resources: ResourceItem[]
+  }>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false)
@@ -67,7 +78,7 @@ export default function Dashboard() {
 
   // Timer effects
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null
+    let intervalId: ReturnType<typeof setInterval> | null = null
 
     if (isRunning) {
       intervalId = setInterval(() => {
@@ -93,6 +104,38 @@ export default function Dashboard() {
     )
   }, [currentSeconds])
 
+  // Persistence: save session to localStorage
+  useEffect(() => {
+    try {
+      const snapshot = {
+        exerciseName,
+        controllerName,
+        exerciseFinishTime,
+        currentSeconds,
+        injects,
+        resources,
+      }
+      localStorage.setItem('excon_session', JSON.stringify(snapshot))
+    } catch {
+      // ignore storage errors
+    }
+  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, injects, resources])
+
+  // Check for existing session on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('excon_session')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          setPendingRestore(parsed)
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [])
+
   // Auto-check for arrived resources
   useEffect(() => {
     setResources(prevResources => 
@@ -106,26 +149,29 @@ export default function Dashboard() {
 
   // Helper function to renumber injects based on due time order
   const renumberInjects = useCallback((injectsList: InjectItem[]): InjectItem[] => {
-    return injectsList
+    return [...injectsList]
       .sort((a, b) => a.dueSeconds - b.dueSeconds)
       .map((inject, index) => ({ ...inject, number: index + 1 }))
   }, [])
 
   // Timer handlers
   const handleStartStop = useCallback(() => {
-    setIsRunning(!isRunning)
-  }, [isRunning])
+    setIsRunning(prev => !prev)
+  }, [])
 
   const handleReset = useCallback(() => {
     setCurrentSeconds(0)
     setIsRunning(false)
   }, [])
 
-  const handleManualTimeSet = useCallback((timeInput: string) => {
+  const handleManualTimeSet = useCallback((timeInput: string): boolean => {
     const parsedSeconds = parseHMS(timeInput)
     if (parsedSeconds !== null) {
       setCurrentSeconds(parsedSeconds)
+      return true
     }
+    logWarn('TimerControls', `Invalid manual time input: ${timeInput}`)
+    return false
   }, [])
 
   // Inject handlers
@@ -222,7 +268,7 @@ export default function Dashboard() {
     )
   }, [])
 
-  const handleResourceETAEdit = useCallback((resourceId: string, newETATime: string) => {
+  const handleResourceETAEdit = useCallback((resourceId: string, newETATime: string): boolean => {
     const newETASeconds = parseHMS(newETATime)
     if (newETASeconds !== null) {
       setResources(prevResources => 
@@ -232,7 +278,10 @@ export default function Dashboard() {
             : resource
         )
       )
+      return true
     }
+    logWarn('ResourceRequestBoard', `Invalid ETA time input: ${newETATime}`)
+    return false
   }, [])
 
   // Import handlers
@@ -277,9 +326,93 @@ export default function Dashboard() {
     setFilterState(prev => ({ ...prev, ...newFilters }))
   }, [])
 
+  // Session controls
+  const handleExportSession = useCallback(() => {
+    const data = {
+      exerciseName,
+      controllerName,
+      exerciseFinishTime,
+      currentSeconds,
+      injects,
+      resources,
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'excon-session.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, injects, resources])
+
+  const handleImportSessionClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleImportSessionFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result))
+        if (data) {
+          setExerciseName(data.exerciseName || 'Untitled Exercise')
+          setControllerName(data.controllerName || '')
+          setExerciseFinishTime(data.exerciseFinishTime || '')
+          setCurrentSeconds(typeof data.currentSeconds === 'number' ? data.currentSeconds : 0)
+          setInjects(Array.isArray(data.injects) ? data.injects : [])
+          setResources(Array.isArray(data.resources) ? data.resources : [])
+        }
+      } catch (err) {
+        logWarn('Dashboard', `Failed to import session JSON: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+    reader.readAsText(file)
+    // reset file input
+    e.target.value = ''
+  }, [])
+
+  const handleExportLogs = useCallback(() => {
+    const logs = logger.exportLogs()
+    const content = `ERROR LOG\n${logs.errorLog}\n\nTASK LOG\n${logs.taskLog}`
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'excon-logs.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [])
+
+  const handleRestoreSession = useCallback(() => {
+    if (!pendingRestore) return
+    setExerciseName(pendingRestore.exerciseName || 'Untitled Exercise')
+    setControllerName(pendingRestore.controllerName || '')
+    setExerciseFinishTime(pendingRestore.exerciseFinishTime || '')
+    setCurrentSeconds(typeof pendingRestore.currentSeconds === 'number' ? pendingRestore.currentSeconds : 0)
+    setInjects(Array.isArray(pendingRestore.injects) ? pendingRestore.injects : [])
+    setResources(Array.isArray(pendingRestore.resources) ? pendingRestore.resources : [])
+    setPendingRestore(null)
+  }, [pendingRestore])
+
+  const handleDismissRestore = useCallback(() => {
+    localStorage.removeItem('excon_session')
+    setPendingRestore(null)
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
+        {pendingRestore && (
+          <div className="mb-4 p-3 bg-blue-900 border border-blue-600 rounded text-white flex items-center justify-between">
+            <div>Previous session found. Restore it?</div>
+            <div className="flex gap-2">
+              <button onClick={handleRestoreSession} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded">Restore</button>
+              <button onClick={handleDismissRestore} className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded">Dismiss</button>
+            </div>
+          </div>
+        )}
         {/* Exercise Overview - displays prominently when fields are filled */}
         <ExerciseOverview 
           exerciseName={exerciseName}
@@ -296,6 +429,14 @@ export default function Dashboard() {
           onFinishTimeChange={handleFinishTimeChange}
         />
         
+        {/* Session Controls */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <button onClick={handleExportSession} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded">Export Session</button>
+          <button onClick={handleImportSessionClick} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded">Import Session</button>
+          <input ref={fileInputRef} type="file" accept="application/json" onChange={handleImportSessionFile} className="hidden" />
+          <button onClick={handleExportLogs} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded">Export Logs</button>
+        </div>
+
         {/* Main Section: Timer and Resource Requests */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Timer Controls */}
@@ -339,7 +480,6 @@ export default function Dashboard() {
           <InjectList
             injects={injects}
             currentSeconds={currentSeconds}
-            editingState={{ editingField: null, editingValue: '' }}
             onUpdateInjects={handleUpdateInjects}
             onToggleInjectStatus={handleToggleInjectStatus}
             onMoveInject={handleMoveInject}

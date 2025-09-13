@@ -1,4 +1,4 @@
-# EXCON Dashboard
+﻿# EXCON Dashboard
 
 A comprehensive emergency exercise control system designed to support emergency management professionals in conducting, monitoring, and managing emergency exercises. Built with modern web technologies (Next.js, React, TypeScript) and following established emergency management standards.
 
@@ -26,31 +26,31 @@ The project follows a modern component-based architecture:
 
 ```
 app/
-├── dashboard/page.tsx          # Main dashboard (384 lines, refactored from 2,312)
-├── components/
-│   ├── exercise/               # Exercise management components
-│   │   ├── ExerciseHeader.tsx
-│   │   └── ExerciseOverview.tsx
-│   ├── dashboard/              # Dashboard widgets
-│   │   ├── TimerControls.tsx
-│   │   ├── ResourceRequestBoard.tsx
-│   │   └── InjectList.tsx
-│   ├── timeline/               # Timeline visualization
-│   │   ├── Timeline.tsx
-│   │   └── TimelineFilterBar.tsx
-│   ├── forms/                  # Data entry forms
-│   │   ├── AddInjectForm.tsx
-│   │   └── AddResourceForm.tsx
-│   ├── modals/                 # Import/export modals
-│   │   ├── ImportInjectsModal.tsx
-│   │   └── ImportResourcesModal.tsx
-│   └── shared/
-│       └── types.ts            # TypeScript type definitions
-└── utils/                      # Utility libraries
-    ├── timeUtils.ts           # Time formatting and parsing
-    ├── styleUtils.ts          # Component styling helpers
-    ├── validation.ts          # Data validation utilities
-    └── importExportUtils.ts   # Spreadsheet processing
+ dashboard/page.tsx          # Main dashboard (384 lines, refactored from 2,312)
+ components/
+    exercise/               # Exercise management components
+       ExerciseHeader.tsx
+       ExerciseOverview.tsx
+    dashboard/              # Dashboard widgets
+       TimerControls.tsx
+       ResourceRequestBoard.tsx
+       InjectList.tsx
+    timeline/               # Timeline visualization
+       Timeline.tsx
+       TimelineFilterBar.tsx
+    forms/                  # Data entry forms
+       AddInjectForm.tsx
+       AddResourceForm.tsx
+    modals/                 # Import/export modals
+       ImportInjectsModal.tsx
+       ImportResourcesModal.tsx
+    shared/
+        types.ts            # TypeScript type definitions
+ utils/                      # Utility libraries
+     timeUtils.ts           # Time formatting and parsing
+     styleUtils.ts          # Component styling helpers
+     validation.ts          # Data validation utilities
+     importExportUtils.ts   # Spreadsheet processing
 ```
 
 ## Getting Started
@@ -134,7 +134,7 @@ The dashboard is designed around the **Australian Institute for Disaster Resilie
 
 ## Project Status
 
-**Phase 1: Architecture Refactoring ✅ COMPLETED**
+**Phase 1: Architecture Refactoring  COMPLETED**
 
 Successfully transformed from a monolithic 2,312-line file into a modern, maintainable React application with:
 - 16 focused components with single responsibilities
@@ -158,3 +158,38 @@ The EXCON Dashboard follows established emergency management methodologies and i
 ## License
 
 Private project for emergency management professional use.
+
+## Icon Strategy
+
+Default icons are inline SVGs for clarity and performance. Set `NEXT_PUBLIC_ICON_MODE=ascii` to force ASCII labels. All icons come from `app/utils/iconHelpers.tsx`.
+ - Inject types: person, phone, envelope, map, dot
+ - Resource types: truck, ambulance, helicopter, police, fire, medical, generic
+ - Resource status: shown as a colored ring around the icon
+
+## Environment Variables
+
+- `NEXT_PUBLIC_ICON_MODE`: `svg` (default) or `ascii` to switch icon rendering.
+
+## Persistence
+
+Session state (exercise info, timer, injects, resources) persists to `localStorage`. A restore banner appears on load if a previous session is found. Use Export/Import Session buttons on the Dashboard to backup or load JSON.
+
+## How To Test
+
+- Lint: `npm run lint`
+- Build: `npm run build`
+- Run: `npm run dev` then open `/dashboard`
+- Suggested tests (to add): time parsing/formatting utils, validation, and key component render tests.
+
+## Known Limitations
+
+- No automated test suite yet; see suggestions above.
+- Resource type is inferred from label if `kind` is not provided.
+- Persistence uses browser `localStorage` (cleared by browser policies/private mode).
+
+## References
+
+- Support documents: see `support docs/` for AIDR-aligned materials.
+- Contributor guide: see `AGENTS.md` for project conventions.
+
+

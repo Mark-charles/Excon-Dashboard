@@ -1,7 +1,8 @@
-'use client'
+﻿'use client'
 
 import React from 'react'
 import type { FilterState } from '../shared/types'
+import { getInjectTypeGlyph, getResourceStatusGlyph } from '../../utils/iconHelpers'
 
 interface TimelineFilterBarProps {
   filterState: FilterState
@@ -41,7 +42,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showInjects: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-white text-sm">📋 Injects</span>
+              <span className="text-white text-sm">Injects</span>
             </label>
             <label className="flex items-center">
               <input
@@ -50,7 +51,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showResources: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-white text-sm">🚛 Resources</span>
+              <span className="text-white text-sm">Resources</span>
             </label>
           </div>
         </div>
@@ -66,7 +67,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showInPerson: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-blue-400 text-sm">👤 In Person</span>
+              <span className="text-blue-400 text-sm">{getInjectTypeGlyph('in person')} In Person</span>
             </label>
             <label className="flex items-center">
               <input
@@ -75,7 +76,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showRadioPhone: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-green-400 text-sm">📞 Radio/Phone</span>
+              <span className="text-green-400 text-sm">{getInjectTypeGlyph('radio/phone')} Radio/Phone</span>
             </label>
             <label className="flex items-center">
               <input
@@ -84,7 +85,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showElectronic: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-purple-400 text-sm">💻 Electronic</span>
+              <span className="text-purple-400 text-sm">{getInjectTypeGlyph('electronic')} Electronic</span>
             </label>
             <label className="flex items-center">
               <input
@@ -93,7 +94,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showMapInject: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-red-400 text-sm">🗺️ Map Inject</span>
+              <span className="text-red-400 text-sm">{getInjectTypeGlyph('map inject')} Map Inject</span>
             </label>
             <label className="flex items-center">
               <input
@@ -102,7 +103,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showOther: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-orange-400 text-sm">❓ Other</span>
+              <span className="text-orange-400 text-sm">{getInjectTypeGlyph('other')} Other</span>
             </label>
           </div>
         </div>
@@ -118,7 +119,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showRequestedStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-gray-400 text-sm">❔ Requested</span>
+              <span className="text-gray-400 text-sm">{getResourceStatusGlyph('requested')} Requested</span>
             </label>
             <label className="flex items-center">
               <input
@@ -127,7 +128,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showTaskedStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-amber-400 text-sm">📋 Tasked</span>
+              <span className="text-amber-400 text-sm">{getResourceStatusGlyph('tasked')} Tasked</span>
             </label>
             <label className="flex items-center">
               <input
@@ -136,7 +137,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showEnrouteStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-blue-400 text-sm">🚗 Enroute</span>
+              <span className="text-blue-400 text-sm">{getResourceStatusGlyph('enroute')} Enroute</span>
             </label>
             <label className="flex items-center">
               <input
@@ -145,7 +146,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showArrivedStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-green-400 text-sm">✅ Arrived</span>
+              <span className="text-green-400 text-sm">{getResourceStatusGlyph('arrived')} Arrived</span>
             </label>
             <label className="flex items-center">
               <input
@@ -154,7 +155,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showCancelledStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-red-400 text-sm">❌ Cancelled</span>
+              <span className="text-red-400 text-sm">{getResourceStatusGlyph('cancelled')} Cancelled</span>
             </label>
           </div>
         </div>
@@ -164,3 +165,5 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
 }
 
 export default TimelineFilterBar
+
+
