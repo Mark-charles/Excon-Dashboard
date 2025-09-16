@@ -70,9 +70,14 @@ interface ValidationListProps {
 const ValidationList: React.FC<ValidationListProps> = ({ errors }) => {
   if (errors.length === 0) return null
 
-  // Separate errors from warnings
-  const actualErrors = errors.filter(e => !e.startsWith('⚠️') && !e.startsWith('---'))
-  const warnings = errors.filter(e => e.startsWith('⚠️'))
+  const actualErrors = errors.filter(e => !e.startsWith('WARNING:') && !e.startsWith('---'))
+  const warnings = errors.filter(e => e.startsWith('WARNING:'))
+
+  const renderIcon = (color: string) => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2l10 19H2l10-19z" fill={color} />
+    </svg>
+  )
 
   return (
     <div className="mt-4 space-y-4">
@@ -85,7 +90,7 @@ const ValidationList: React.FC<ValidationListProps> = ({ errors }) => {
           <div className="max-h-32 overflow-y-auto bg-red-900/20 border border-red-600/50 rounded-lg p-3">
             {actualErrors.map((error, index) => (
               <div key={index} className="text-red-400 text-sm mb-1 flex items-start gap-2">
-                <span className="text-red-500 mt-0.5">•</span>
+                <span className="text-red-500 mt-0.5">{renderIcon('#f87171')}</span>
                 <span>{error}</span>
               </div>
             ))}
@@ -100,11 +105,11 @@ const ValidationList: React.FC<ValidationListProps> = ({ errors }) => {
             MSE Quality Warnings ({warnings.length})
           </h4>
           <div className="max-h-32 overflow-y-auto bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-3">
-            <div className="text-yellow-300 text-xs mb-2 italic">These warnings don&apos;t prevent import but may indicate data quality issues:</div>
+            <div className="text-yellow-300 text-xs mb-2 italic">Warnings do not block import but may indicate data quality issues.</div>
             {warnings.map((warning, index) => (
               <div key={index} className="text-yellow-400 text-sm mb-1 flex items-start gap-2">
-                <span className="text-yellow-500 mt-0.5">⚠</span>
-                <span>{warning.replace('⚠️ ', '')}</span>
+                <span className="text-yellow-500 mt-0.5">{renderIcon('#facc15')}</span>
+                <span>{warning.replace('WARNING: ', '')}</span>
               </div>
             ))}
           </div>
@@ -121,78 +126,44 @@ interface PreviewTableProps {
 const PreviewTable: React.FC<PreviewTableProps> = ({ injects }) => {
   if (injects.length === 0) return null
 
-  const displayItems = injects.slice(0, 20) // Show first 20 rows for better readability
+  const previewRows = injects.slice(0, 20)
 
   return (
     <div className="mt-6">
       <h4 className="text-lg font-semibold text-white mb-3">MSE Preview ({injects.length} valid injects)</h4>
       <div className="overflow-x-auto max-h-96 border border-gray-600 rounded-lg shadow-xl">
-        {/* Professional MSE-style preview table */}
-        <div className="min-w-[1200px]">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 border-b-2 border-blue-500/70 sticky top-0 z-10">
-            <div className="grid grid-cols-10 gap-2 px-3 py-3 text-xs font-bold text-blue-100 uppercase tracking-wide" style={{
-              gridTemplateColumns: '70px 90px 1fr 110px 110px 120px 180px 110px 90px 50px'
-            }}>
-              <div className="text-center">Inject<br/>Number</div>
-              <div className="text-center">Elapsed<br/>Time</div>
-              <div className="text-left pl-2">Inject</div>
-              <div className="text-center">Inject<br/>From</div>
-              <div className="text-center">Inject<br/>To</div>
-              <div className="text-center">Inject<br/>Type</div>
-              <div className="text-left pl-2">Additional Notes/Actions</div>
-              <div className="text-center">Resources</div>
-              <div className="text-center">Completed</div>
-              <div className="text-center">✓</div>
-            </div>
-          </div>
-
-          {/* Body */}
-          <div className="bg-gradient-to-b from-gray-900 to-slate-900">
-            {displayItems.map((inject, index) => (
-              <div
-                key={index}
-                className={`
-                  grid grid-cols-10 gap-2 px-3 py-4 border-b border-gray-700/40 text-sm
-                  ${index % 2 === 0 ? 'bg-slate-900/50' : 'bg-gray-900/30'}
-                `}
-                style={{
-                  gridTemplateColumns: '70px 90px 1fr 110px 110px 120px 180px 110px 90px 50px'
-                }}
-              >
-                <div className="text-center text-blue-400 font-bold">#{inject.number}</div>
-                <div className="text-center text-green-400 font-mono font-medium">{formatHMS(inject.dueSeconds)}</div>
-                <div className="text-white text-sm leading-relaxed pl-2">{inject.title}</div>
-                <div className="text-center text-gray-300">{inject.from || 'ExCon'}</div>
-                <div className="text-center text-gray-300">{inject.to || 'All Units'}</div>
-                <div className="text-center">
-                  <span className="px-2 py-1 rounded bg-gray-700/50 text-gray-200 text-xs capitalize">
-                    {inject.type === 'in person' ? 'Face to Face' :
-                     inject.type === 'radio/phone' ? 'Radio' :
-                     inject.type === 'map inject' ? 'Map' :
-                     inject.type.charAt(0).toUpperCase() + inject.type.slice(1)}
-                  </span>
-                </div>
-                <div className="text-gray-300 text-sm leading-relaxed pl-2">{inject.notes || ''}</div>
-                <div className="text-center text-emerald-400 text-sm">{inject.resources || ''}</div>
-                <div className="text-center">
-                  <span className="px-2 py-1 rounded-full bg-gray-700/30 text-gray-400 text-xs">No</span>
-                </div>
-                <div className="text-center">
-                  <div className="w-3 h-3 bg-gray-400 rounded-full mx-auto"></div>
-                </div>
-              </div>
+        <table className="min-w-full text-sm text-gray-200">
+          <thead className="bg-blue-900/80 uppercase tracking-wide text-xs text-blue-100">
+            <tr>
+              <th className="px-3 py-2 text-center">Inject #</th>
+              <th className="px-3 py-2 text-center">Elapsed</th>
+              <th className="px-3 py-2 text-left">Inject</th>
+              <th className="px-3 py-2 text-center">From</th>
+              <th className="px-3 py-2 text-center">To</th>
+              <th className="px-3 py-2 text-center">Type</th>
+              <th className="px-3 py-2 text-left">Notes / Actions</th>
+              <th className="px-3 py-2 text-center">Resources</th>
+            </tr>
+          </thead>
+          <tbody className="bg-gray-900/80 divide-y divide-gray-700">
+            {previewRows.map((inject, index) => (
+              <tr key={index} className={index % 2 === 0 ? 'bg-slate-900/60' : 'bg-gray-900/40'}>
+                <td className="px-3 py-2 text-center text-blue-300 font-semibold">#{inject.number}</td>
+                <td className="px-3 py-2 text-center font-mono text-emerald-300">{formatHMS(inject.dueSeconds)}</td>
+                <td className="px-3 py-2 text-left text-white">{inject.title}</td>
+                <td className="px-3 py-2 text-center">{inject.from || 'ExCon'}</td>
+                <td className="px-3 py-2 text-center">{inject.to || 'All Units'}</td>
+                <td className="px-3 py-2 text-center">{inject.type}</td>
+                <td className="px-3 py-2 text-left">{inject.notes || '-'}</td>
+                <td className="px-3 py-2 text-center text-emerald-300">{inject.resources || '-'}</td>
+              </tr>
             ))}
-          </div>
-        </div>
+          </tbody>
+        </table>
 
         {injects.length > 20 && (
-          <div className="p-3 text-center text-gray-400 text-sm border-t border-gray-600 bg-gray-800/50">
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-              <span>Showing first 20 of {injects.length} injects</span>
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-            </div>
+          <div className="p-3 text-center text-gray-400 text-xs border-t border-gray-600 bg-gray-800/60">
+            Showing first 20 of {injects.length} injects
           </div>
         )}
       </div>
@@ -225,8 +196,11 @@ const ImportInjectsModal: React.FC<ImportInjectsModalProps> = ({
     setIsProcessing(false)
   }
 
+  const hasActualErrors = validationErrors.some(e => !e.startsWith('WARNING:') && !e.startsWith('---'))
+  const canImport = !hasActualErrors && previewInjects.length > 0 && !isProcessing
+
   const handleImport = () => {
-    if (validationErrors.length > 0 || previewInjects.length === 0) return
+    if (hasActualErrors || previewInjects.length === 0) return
     
     onImport(previewInjects, importMode)
     handleClose()
@@ -240,10 +214,6 @@ const ImportInjectsModal: React.FC<ImportInjectsModalProps> = ({
     setIsProcessing(false)
     onClose()
   }
-
-  // Allow import if there are no actual errors (warnings are OK)
-  const hasActualErrors = validationErrors.some(e => !e.startsWith('⚠️') && !e.startsWith('---'))
-  const canImport = !hasActualErrors && previewInjects.length > 0 && !isProcessing
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -360,3 +330,4 @@ const ImportInjectsModal: React.FC<ImportInjectsModalProps> = ({
 }
 
 export default ImportInjectsModal
+

@@ -456,7 +456,7 @@ export default function Dashboard() {
     const marginX = 48
     let y = 56
 
-    const addLine = (text: string, fontSize = 11, color: [number, number, number] = [255,255,255]) => {
+    const addLine = (text: string, fontSize = 11, color: [number, number, number] = [34,38,45]) => {
       doc.setFontSize(fontSize)
       doc.setTextColor(color[0], color[1], color[2])
       doc.text(text, marginX, y)
@@ -476,6 +476,7 @@ export default function Dashboard() {
     // Meta
     y = 64
     doc.setFont('helvetica', 'normal')
+    doc.setTextColor(34, 38, 45)
     addLine(`Exercise: ${exerciseName}`, 12)
     addLine(`Controller: ${controllerName || '-'}`, 12)
     addLine(`Elapsed: ${formatHMS(currentSeconds)}  Finish: ${exerciseFinishTime || '-'}`, 12)
@@ -594,7 +595,13 @@ export default function Dashboard() {
                 data-label="Restore"
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-md hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 focus-visible:ring-offset-gray-900 icon-btn"
               >
-                ↻ Restore
+                <span className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M21 12a9 9 0 10-3 6.708" stroke="currentColor" strokeWidth="2" fill="none"/>
+                    <path d="M21 8v4h-4" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  </svg>
+                  Restore
+                </span>
               </button>
               <button 
                 onClick={handleDismissRestore} 

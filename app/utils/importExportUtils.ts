@@ -422,7 +422,7 @@ export const processInjectsFile = async (file: File, existingInjects: InjectItem
       // Add warnings as informational messages (but don't block import)
       if (mseValidation.warnings.length > 0) {
         errors.push('--- MSE Quality Warnings ---')
-        errors.push(...mseValidation.warnings.map(w => `⚠️ ${w}`))
+        errors.push(...mseValidation.warnings.map(w => `WARNING: ${w}`))
       }
     }
 
@@ -526,3 +526,8 @@ export const processResourcesFile = async (file: File, currentSeconds: number): 
     }
   }
 }
+
+
+
+
+

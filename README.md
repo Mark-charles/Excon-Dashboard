@@ -1,197 +1,86 @@
-﻿# EXCON Dashboard
+# EXCON Dashboard
 
-A comprehensive emergency exercise control system designed to support emergency management professionals in conducting, monitoring, and managing emergency exercises. Built with modern web technologies (Next.js, React, TypeScript) and following established emergency management standards.
+The EXCON Dashboard is a Next.js/React application used by exercise controllers to run emergency management training events. It delivers a single-screen operations view that keeps the timer, master schedule of events (MSE), resource requests, and activity reporting in sync.
 
-## Overview
+## Current Capabilities
+- Exercise timer with start/stop/reset, manual time overrides, and automatic persistence.
+- Master Schedule management with inline editing, status toggles, drag-free reordering via due times, and CSV/XLSX/DOCX import support.
+- Resource request board with status workflows (requested -> tasked -> enroute -> arrived/cancelled), inline ETA edits, and CSV/XLSX import.
+- Interactive combined timeline for injects and resources, including per-type/status filters and responsive sizing.
+- Session persistence backed by `localStorage`, plus manual JSON export/import, consolidated PDF reporting, and log export from the Dashboard Admin panel.
+- Activity logging for inject/resource/session events that feeds JSON exports, PDF reports, and future audit features.
 
-The EXCON Dashboard provides real-time exercise control capabilities including:
-- **Exercise Timer Control**: Precision timing with pause/resume capabilities
-- **Inject Management**: Timed delivery of scenario information to participants
-- **Resource Tracking**: Monitor emergency resource requests, deployment, and status
-- **Interactive Timeline**: Visual representation of exercise events and milestones
-- **Import/Export**: Bulk loading of scenarios and resources from spreadsheets
-- **Admin Panel**: Export/Import Exercise JSON, Export Logs, PDF report, Reset
-- **Real-time Documentation**: Automatic logging of actions and events
+## Architecture & Technology
+- React 19.1 with the Next.js 15 App Router and strict TypeScript across the codebase.
+- Tailwind CSS 4 for theming; key variants live in `app/globals.css` and `tailwind.config.js`.
+- Component breakdown lives under `app/components/`:
+  - `exercise/` - header and overview cards
+  - `dashboard/` - timer, request board, inject list widgets
+  - `forms/` - add/inject and add/resource forms
+  - `modals/` - import flows for injects and resources
+  - `timeline/` - combined exercise timeline and filters
+  - `shared/` - common types and global initialisation
+- Utility modules in `app/utils/` handle validation, import/export (XLSX + Mammoth DOCX parsing), style tokens, icons, logging, and time helpers.
 
-## Technology Stack
-
-- **Framework**: Next.js 15.5.0 with React 19.1.0
-- **Language**: TypeScript with strict type checking
-- **Styling**: Tailwind CSS 4.0 with dark theme optimization
-- **Data Processing**: XLSX library for spreadsheet import/export
-- **Build System**: Turbopack for fast development builds
-
-## Architecture
-
-The project follows a modern component-based architecture:
-
-```
-app/
- dashboard/page.tsx          # Main dashboard (384 lines, refactored from 2,312)
- components/
-    exercise/               # Exercise management components
-       ExerciseHeader.tsx
-       ExerciseOverview.tsx
-    dashboard/              # Dashboard widgets
-       TimerControls.tsx
-       ResourceRequestBoard.tsx
-       InjectList.tsx
-    timeline/               # Timeline visualization
-       Timeline.tsx
-       TimelineFilterBar.tsx
-    forms/                  # Data entry forms
-       AddInjectForm.tsx
-       AddResourceForm.tsx
-    modals/                 # Import/export modals
-       ImportInjectsModal.tsx
-       ImportResourcesModal.tsx
-    shared/
-        types.ts            # TypeScript type definitions
- utils/                      # Utility libraries
-     timeUtils.ts           # Time formatting and parsing
-     styleUtils.ts          # Component styling helpers
-     validation.ts          # Data validation utilities
-     importExportUtils.ts   # Spreadsheet processing
-```
-
-## Getting Started
-
+## Local Development
 ### Prerequisites
+- Node.js 18+
 
-- Node.js 18+ 
-- npm, yarn, pnpm, or bun
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-### Development
-
-Start the development server with Turbopack:
-
+### Install & Run
 ```bash
+npm install
 npm run dev
 ```
+Visit `http://localhost:3000/dashboard` for the dashboard view.
 
-Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard) to access the EXCON Dashboard.
-
-### Build
-
-Create a production build:
-
+### Production Build
 ```bash
 npm run build
-```
-
-Start the production server:
-
-```bash
 npm start
 ```
 
-## Features
+### Quality Checks
+```bash
+npm run lint
+```
+No automated tests exist yet; see the plan for proposed coverage.
 
-### Exercise Management
-- Configure exercise parameters and objectives
-- Set exercise finish times and milestones
-- Real-time exercise overview display
+## Data, Persistence, and Import/Export
+- Injects: accepts CSV/XLSX (first worksheet) or DOCX tables. Columns are fuzzy-matched and validated before import.
+- Resources: accepts CSV/XLSX; ETA minutes convert to exercise-relative seconds.
+- Append imports deduplicate on the tuple `(title, dueSeconds)` for injects and `(label, etaSeconds)` for resources.
+- Sessions persist automatically to `localStorage` (`excon_session`) and surface a restore banner on load.
+- Manual export/import is available via the Dashboard Admin controls (`excon-exercise.json`).
 
-### Timeline Visualization
-- Interactive timeline showing all exercise events
-- Visual stacking of simultaneous events
-- Comprehensive filtering system
-- Real-time progress tracking
-
-### Inject System
-- Timed delivery of scenario information
-- Multiple inject types (radio/phone, in-person, electronic, map inject)
-- Automatic status tracking (pending, completed, missed, skipped)
-- Bulk import from CSV/Excel files
-
-### Resource Management
-- Track emergency resource requests and deployment
-- Multiple status states (requested, tasked, enroute, arrived, cancelled)
-- ETA calculation and automatic arrival detection
-- Visual status indicators with color coding
-
-### Data Import/Export
-- Template download for structured data entry
-- CSV and Excel file support
-- Data validation with error reporting
-- Duplicate detection and handling
-- Preview functionality before import
- - Admin panel actions: Export/Import Exercise JSON, Export Logs, PDF Report, Reset Dashboard
-
-## Standards Compliance
-
-The dashboard is designed around the **Australian Institute for Disaster Resilience (AIDR)** emergency exercise standards and incorporates international best practices including:
-- FEMA Exercise Evaluation Methodology (EEM)
-- Multi-Agency Coordination (MAC) principles
-- Incident Command System (ICS) integration
-- Emergency Support Functions (ESF) alignment
-
-## Project Status
-
-**Phase 1: Architecture Refactoring  COMPLETED**
-
-Successfully transformed from a monolithic 2,312-line file into a modern, maintainable React application with:
-- 16 focused components with single responsibilities
-- 100% TypeScript coverage with strict type checking
-- Performance optimization with React.memo and useCallback
-- Enterprise-ready code quality and organization
-
-**Phase 2: Core Feature Enhancement** - Ready to Begin
-
-See `plan.md` for detailed Phase 2 roadmap including user experience improvements, exercise management features, enhanced data handling, and mobile optimization.
-
-## Documentation
-
-- `projectbackground.md` - Comprehensive project overview and context
-- `plan.md` - Development roadmap and feature planning
-
-## Contributing
-
-The EXCON Dashboard follows established emergency management methodologies and is designed for scalability and extensibility. All contributions should maintain the focus on practical, effective emergency management training.
-
-## License
-
-Private project for emergency management professional use.
-
-## Icon Strategy
-
-Default icons are inline SVGs for clarity and performance. Set `NEXT_PUBLIC_ICON_MODE=ascii` to force ASCII labels. All icons come from `app/utils/iconHelpers.tsx`.
- - Inject types: person, phone, envelope, map, dot
- - Resource types: truck, ambulance, helicopter, police, fire, medical, generic
- - Resource status: shown as a colored ring around the icon
+## Logging & Reporting
+- Client-side logging (`app/utils/loggingUtils.ts`) stores error/task entries in `localStorage` and exposes download via "Export Logs".
+- `handleExportReport` compiles injects, resources, logs, and the activity timeline into `excon-report.pdf` using jsPDF.
+- `error.log` and `task.log` files in the repo capture manually curated notes; app output stays in the browser today.
 
 ## Environment Variables
+- `NEXT_PUBLIC_ICON_MODE`: `svg` (default) renders inline SVG glyphs, `ascii` swaps to simple text markers. See `app/utils/iconConfig.ts`.
 
-- `NEXT_PUBLIC_ICON_MODE`: `svg` (default) or `ascii` to switch icon rendering.
+## Documentation Set
+- `projectbackground.md` - strategic background, users, and standards alignment.
+- `plan.md` - delivery roadmap with current priorities.
+- `task.log` / `error.log` - manual tracking of completed work and outstanding issues.
+- `support docs/` - AIDR-aligned reference material used for scenario design.
 
-## Persistence
+## Project Status - 13 Sep 2025
+- Phase 1 refactor complete: monolith replaced with modular components, strict typing, shared utilities, and memoisation improvements.
+- Recently delivered: dashboard admin panel with JSON/log/PDF export, activity tracking, import modal refresh, icon helper system, and responsive timeline polish.
+- Remaining immediate focus: mobile/tablet layout audit, hardening import validation (clean warnings + better UX), structured automated test harness, and a real persistence/logging backend.
 
-Session state (exercise info, timer, injects, resources, activity) persists to `localStorage`. A restore banner appears on load if a previous session is found. Use the Dashboard Admin panel (bottom of the page) to Export/Import Exercise JSON, Export Logs, export a PDF Report, or Reset the Dashboard.
+## Known Issues & Gaps
+- Dashboard Admin logging still writes to browser storage only; teams need durable export/storage for audits.
+- No automated regression tests. Utilities (timeUtils, validation, importExportUtils) and core components lack coverage.
+- Tablet/mobile layout needs targeted tuning before field deployment, especially for the timeline and admin controls.
+- Import flows rely on XLSX/CSV parsing in-browser; DOCX handling still depends on runtime script injection and clearer error surfacing.
 
-## How To Test
-
-- Lint: `npm run lint`
-- Build: `npm run build`
-- Run: `npm run dev` then open `/dashboard`
-- Suggested tests (to add): time parsing/formatting utils, validation, and key component render tests.
-
-## Known Limitations
-
-- No automated test suite yet; see suggestions above.
-- Resource type is inferred from label if `kind` is not provided.
-- Persistence uses browser `localStorage` (cleared by browser policies/private mode).
-
-## References
-
-- Support documents: see `support docs/` for AIDR-aligned materials.
-- Contributor guide: see `AGENTS.md` for project conventions.
+## Next Steps Snapshot
+1. Audit responsive behaviour (tablet/field) and tighten keyboard/a11y affordances.
+2. Implement durable log/export handling so Admin actions persist beyond the session.
+3. Stand up Jest + React Testing Library and cover validation/import/export logic first.
+4. Profile large exercises (500+ injects/200+ resources) and capture optimisation/UX backlog items.
 
 

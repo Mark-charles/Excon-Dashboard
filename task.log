@@ -29,3 +29,7 @@
 [2025-09-13 21:01:02] COMPLETED PDF report enhancements - MSE, Resources, Logs, Activity Timeline; timestamped header
 [2025-09-13 21:01:02] COMPLETED Activity logging - Tracked inject/resource/session/report actions and persisted in session JSON
 [2025-09-13 21:01:02] COMPLETED Cleanup - Removed old Session Management block from dashboard top
+[2025-09-14 00:00:00] COMPLETED MSE UI polish - Removed virtual scrolling bounce, reduced column widths, and eliminated horizontal scrollbar
+[2025-09-14 00:00:01] COMPLETED Import modal UX cleanup - Rebuilt ValidationList/PreviewTable, normalized warning messaging, docx support
+[2025-09-14 00:00:02] COMPLETED Export report styling - Reset default text colour and improved readability
+[2025-09-14 00:00:03] COMPLETED Documentation refresh - Updated README, project background, and delivery plan to current state

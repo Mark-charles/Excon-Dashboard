@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import type { InjectItem, InjectType, EditingState } from '../shared/types'
-import { formatHMS, parseHMS, isCurrentInject } from '../../utils/timeUtils'
+import { formatHMS, parseHMS } from '../../utils/timeUtils'
 import { getInjectTypeGlyph } from '../../utils/iconHelpers'
 import { getInjectTypeTextColor } from '../../utils/styleUtils'
 
@@ -118,13 +118,6 @@ const EditableField: React.FC<EditableFieldProps> = ({
   )
 }
 
-// Virtual scrolling constants
-const ROW_HEIGHT = 80 // Approximate height of each row in pixels
-const BUFFER_SIZE = 5 // Number of extra rows to render above and below visible area
-
-// Performance optimization: Only update virtual scrolling if scroll distance is significant
-const SCROLL_DEBOUNCE_THRESHOLD = 10 // pixels
-
 const InjectList: React.FC<InjectListProps> = React.memo(({
   injects,
   currentSeconds,
@@ -137,11 +130,6 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
   const [localEditingField, setLocalEditingField] = useState<{id: string, field: string} | null>(null)
   const [localEditingValue, setLocalEditingValue] = useState<string>('')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-
-  // Virtual scrolling state
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [scrollTop, setScrollTop] = useState(0)
-  const [containerHeight, setContainerHeight] = useState(700)
 
   const handleStartEdit = (id: string, field: string, currentValue: string | number) => {
     setLocalEditingField({ id, field })
@@ -216,45 +204,114 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
     [injects]
   )
 
-  // Virtual scrolling calculations
-  const visibleItems = useMemo(() => {
-    if (sortedInjects.length <= 20) {
-      // For small lists, render all items
-      return { items: sortedInjects, startIndex: 0, endIndex: sortedInjects.length - 1 }
+  const columnTemplate = 'minmax(3.5rem, 0.6fr) minmax(5.5rem, 0.9fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(7rem, 1fr) minmax(18rem, 2.6fr) minmax(12rem, 1.6fr) minmax(8rem, 1.1fr) minmax(4.5rem, 0.7fr) minmax(6.5rem, 1fr)'
+
+  const renderStatusIcon = (status: InjectItem['status']) => {
+    if (status === 'completed') {
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" className="text-emerald-400" aria-label="Completed" title="Completed">
+          <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" fill="none"/>
+        </svg>
+      )
+    }
+    if (status === 'missed') {
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" className="text-red-400" aria-label="Missed" title="Missed">
+          <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2"/>
+        </svg>
+      )
+    }
+    if (status === 'skipped') {
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" className="text-orange-400" aria-label="Skipped" title="Skipped">
+          <path d="M5 12h14" stroke="currentColor" strokeWidth="2"/>
+        </svg>
+      )
     }
 
-    const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_SIZE)
-    const visibleCount = Math.ceil(containerHeight / ROW_HEIGHT)
-    const endIndex = Math.min(sortedInjects.length - 1, startIndex + visibleCount + BUFFER_SIZE * 2)
+    return (
+      <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400" aria-label="Pending" title="Pending">
+        <circle cx="5" cy="5" r="4" fill="currentColor"/>
+      </svg>
+    )
+  }
 
-    return {
-      items: sortedInjects.slice(startIndex, endIndex + 1),
-      startIndex,
-      endIndex
-    }
-  }, [sortedInjects, scrollTop, containerHeight])
-
-  // Handle scroll events with debouncing for performance
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const newScrollTop = e.currentTarget.scrollTop
-    // Only update if scroll change is significant to reduce re-renders
-    if (Math.abs(newScrollTop - scrollTop) > SCROLL_DEBOUNCE_THRESHOLD) {
-      setScrollTop(newScrollTop)
-    }
-  }, [scrollTop])
-
-  // Update container height on resize
-  useEffect(() => {
-    const updateHeight = () => {
-      if (scrollContainerRef.current) {
-        setContainerHeight(scrollContainerRef.current.clientHeight)
-      }
-    }
-
-    updateHeight()
-    window.addEventListener('resize', updateHeight)
-    return () => window.removeEventListener('resize', updateHeight)
-  }, [])
+  const renderActions = (inject: InjectItem, sortedIndex: number, total: number) => (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onMoveInject(inject.id, 'up')}
+        disabled={sortedIndex === 0}
+        className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        title="Move up"
+        aria-label={`Move inject #${inject.number} up`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M12 5l7 7H5l7-7z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={() => onMoveInject(inject.id, 'down')}
+        disabled={sortedIndex === total - 1}
+        className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        title="Move down"
+        aria-label={`Move inject #${inject.number} down`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M12 19l-7-7h14l-7 7z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={() => onToggleInjectStatus(inject.id)}
+        disabled={inject.status === 'skipped'}
+        className={`p-1 rounded-md transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+          inject.status === 'completed'
+            ? 'bg-gray-600 hover:bg-gray-700 text-white'
+            : 'bg-green-600 hover:bg-green-700 text-white'
+        }`}
+        title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
+        aria-label={inject.status === 'completed'
+          ? `Mark inject #${inject.number} incomplete`
+          : `Mark inject #${inject.number} complete`}
+      >
+        {inject.status === 'completed' ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" fill="none"/>
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => onSkipInject(inject.id)}
+        disabled={inject.status === 'skipped'}
+        className="p-1 rounded-md bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+        title="Skip"
+        aria-label={`Skip inject #${inject.number}`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M5 5l7 7-7 7" stroke="currentColor" strokeWidth="2" fill="none"/>
+          <path d="M13 5v14" stroke="currentColor" strokeWidth="2" fill="none"/>
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={() => onDeleteInject(inject.id)}
+        className="p-1 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+        title="Delete"
+        aria-label={`Delete inject #${inject.number}`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M6 7h12M9 7v12m6-12v12M10 5h4l1 2H9l1-2z" stroke="currentColor" strokeWidth="2"/>
+        </svg>
+      </button>
+    </div>
+  )
 
   return (
     <div className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 rounded-2xl p-6 shadow-2xl border border-gray-600/50 backdrop-blur-sm">
@@ -319,11 +376,9 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
           <div className="text-gray-400">Items will appear here when added to the Master Schedule of Events</div>
         </div>
       ) : viewMode === 'table' ? (
-        <div className="overflow-x-auto">
+        <div className="overflow-hidden">
           <div
-            ref={scrollContainerRef}
             className="max-h-[700px] overflow-y-auto border border-gray-600 rounded-lg shadow-2xl"
-            onScroll={handleScroll}
             role="table"
             aria-label="Master Schedule of Events"
             aria-rowcount={sortedInjects.length + 1}
@@ -333,9 +388,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
             <div className="sticky top-0 bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 border-b-2 border-blue-500/70 z-10 shadow-lg backdrop-blur-sm" role="rowgroup">
               <div
                 className="grid grid-cols-10 gap-2 px-3 py-4 text-sm font-bold text-white tracking-wide"
-                style={{
-                  gridTemplateColumns: '44px 68px 100px 100px 106px 1fr 150px 100px 32px 72px'
-                }}
+                style={{ gridTemplateColumns: columnTemplate }}
                 role="row"
                 aria-rowindex={1}
               >
@@ -353,15 +406,10 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
             </div>
             {/* MSE Body */}
             <div
-              className="bg-gradient-to-b from-gray-900 to-slate-900 relative"
-              style={{ height: sortedInjects.length * ROW_HEIGHT }}
+              className="bg-gradient-to-b from-gray-900 to-slate-900"
               role="rowgroup"
             >
-              {/* Spacer for virtual scrolling offset */}
-              <div style={{ height: visibleItems.startIndex * ROW_HEIGHT }} />
-
-              {visibleItems.items.map((inject, index) => {
-                const sortedIndex = visibleItems.startIndex + index
+              {sortedInjects.map((inject, sortedIndex) => {
                 const isUpcoming = inject.status !== 'completed' && inject.status !== 'missed' && inject.status !== 'skipped' && currentSeconds >= (inject.dueSeconds - 60) && currentSeconds < inject.dueSeconds
                 return (
                 <div
@@ -375,9 +423,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                     ${sortedIndex % 2 === 0 ? 'bg-slate-900/40' : 'bg-gray-900/20'}
                     ${isUpcoming ? 'ring-2 ring-yellow-400/60 animate-pulse' : ''}
                   `}
-                  style={{
-                    gridTemplateColumns: '44px 68px 100px 100px 106px 1fr 150px 100px 32px 72px'
-                  }}
+                  style={{ gridTemplateColumns: columnTemplate }}
                   role="row"
                   aria-rowindex={sortedIndex + 2}
                   aria-label={`Inject ${inject.number}: ${inject.title} at ${formatHMS(inject.dueSeconds)}, status: ${inject.status}`}
@@ -563,90 +609,12 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                     
                   {/* Completed Status (icon-only) */}
                   <div className="flex justify-center items-center" role="gridcell">
-                    {inject.status === 'completed' ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-emerald-400" aria-label="Completed" title="Completed">
-                        <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" fill="none"/>
-                      </svg>
-                    ) : inject.status === 'missed' ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-red-400" aria-label="Missed" title="Missed">
-                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    ) : inject.status === 'skipped' ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-orange-400" aria-label="Skipped" title="Skipped">
-                        <path d="M5 12h14" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    ) : (
-                      <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400" aria-label="Pending" title="Pending">
-                        <circle cx="5" cy="5" r="4" fill="currentColor"/>
-                      </svg>
-                    )}
+                    {renderStatusIcon(inject.status)}
                   </div>
-                    
+
                   {/* Actions */}
                   <div className="flex justify-center items-center" role="gridcell">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onMoveInject(inject.id, 'up')}
-                        disabled={sortedIndex === 0}
-                        className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                        title="Move up"
-                        aria-label={`Move inject #${inject.number} up`}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M12 5l7 7H5l7-7z" fill="currentColor"/>
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onMoveInject(inject.id, 'down')}
-                        disabled={sortedIndex === injects.length - 1}
-                        className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                        title="Move down"
-                        aria-label={`Move inject #${inject.number} down`}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M12 19l-7-7h14l-7 7z" fill="currentColor"/>
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onToggleInjectStatus(inject.id)}
-                        disabled={inject.status === 'skipped'}
-                        className={`p-1 rounded-md transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                          inject.status === 'completed'
-                            ? 'bg-gray-600 hover:bg-gray-700 text-white'
-                            : 'bg-green-600 hover:bg-green-700 text-white'
-                        }`}
-                        title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
-                        aria-label={inject.status === 'completed' ? `Mark inject #${inject.number} incomplete` : `Mark inject #${inject.number} complete`}
-                      >
-                        {inject.status === 'completed' ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2"/></svg>
-                        ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2"/></svg>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSkipInject(inject.id)}
-                        disabled={inject.status === 'skipped' || inject.status === 'completed'}
-                        className="p-1 rounded-md bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                        title="Skip"
-                        aria-label={`Skip inject #${inject.number}`}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2"/></svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteInject(inject.id)}
-                        className="p-1 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                        title="Delete"
-                        aria-label={`Delete inject #${inject.number}`}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 7h12M9 7v12m6-12v12M10 5h4l1 2H9l1-2z" stroke="currentColor" strokeWidth="2"/></svg>
-                      </button>
-                    </div>
+                    {renderActions(inject, sortedIndex, sortedInjects.length)}
                   </div>
                 </div>
                 )
@@ -655,29 +623,36 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {sortedInjects.map((inject, sortedIndex) => {
             const isUpcoming = inject.status !== 'completed' && inject.status !== 'missed' && inject.status !== 'skipped' && currentSeconds >= (inject.dueSeconds - 60) && currentSeconds < inject.dueSeconds
             return (
-              <div key={inject.id} className={`rounded-xl border border-gray-700/60 bg-gray-800/40 p-3 transition-colors ${inject.status==='completed'?'bg-emerald-900/30':''} ${inject.status==='missed'?'bg-red-900/30':''} ${inject.status!=='completed'&&inject.status!=='missed'&&currentSeconds<inject.dueSeconds?'bg-gray-900/20':''} ${isUpcoming?'ring-2 ring-yellow-400/60 animate-pulse':''}`}>
-                <div className="flex flex-wrap items-start gap-2">
-                  <div className="text-xs text-gray-400 font-mono">{formatHMS(inject.dueSeconds)}</div>
-                  <div className="text-xs text-gray-400">#{inject.number}</div>
-                  <div className="text-xs text-gray-400">From: <span className="text-gray-200">{inject.from || '-'}</span></div>
-                  <div className="text-xs text-gray-400">To: <span className="text-gray-200">{inject.to || 'All'}</span></div>
-                  <div className={`text-xs inline-flex items-center gap-1 ${getInjectTypeTextColor(inject.type)}`}>
+              <div
+                key={inject.id}
+                className={`rounded-xl border border-gray-700/60 bg-gray-800/40 p-4 transition-colors shadow-inner ${
+                  inject.status === 'completed' ? 'bg-emerald-900/30' : ''
+                } ${
+                  inject.status === 'missed' ? 'bg-red-900/30' : ''
+                } ${
+                  inject.status !== 'completed' && inject.status !== 'missed' && currentSeconds < inject.dueSeconds ? 'bg-gray-900/20' : ''
+                } ${isUpcoming ? 'ring-2 ring-yellow-400/60 animate-pulse' : ''}`}
+              >
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-300">
+                  <span className="font-mono text-sm text-green-300">{formatHMS(inject.dueSeconds)}</span>
+                  <span className="text-blue-300 font-semibold">#{inject.number}</span>
+                  <span>From <span className="text-gray-100">{inject.from || 'ExCon'}</span></span>
+                  <span>To <span className="text-gray-100">{inject.to || 'All Units'}</span></span>
+                  <span className={`inline-flex items-center gap-2 px-2 py-1 rounded bg-gray-700/40 ${getInjectTypeTextColor(inject.type)}`}>
                     <span>{getInjectTypeGlyph(inject.type, 'svg', 'small')}</span>
                     <span className="capitalize">{inject.type}</span>
-                  </div>
-                  <div className="ml-auto flex items-center gap-1">
-                    <button title="Move up" aria-label={`Move inject #${inject.number} up`} onClick={() => onMoveInject(inject.id, 'up')} className="p-1 text-xs text-gray-400 hover:text-white">▲</button>
-                    <button title="Move down" aria-label={`Move inject #${inject.number} down`} onClick={() => onMoveInject(inject.id, 'down')} className="p-1 text-xs text-gray-400 hover:text-white">▼</button>
-                    <button title={inject.status==='completed'?'Mark incomplete':'Mark complete'} aria-label={inject.status==='completed'?`Mark inject #${inject.number} incomplete`:`Mark inject #${inject.number} complete`} onClick={() => onToggleInjectStatus(inject.id)} className={`p-1 rounded ${inject.status==='completed'?'bg-gray-600 hover:bg-gray-700':'bg-green-600 hover:bg-green-700'} text-white`}>{inject.status==='completed'?'↺':'✓'}</button>
-                    <button title="Skip" aria-label={`Skip inject #${inject.number}`} onClick={() => onSkipInject(inject.id)} className="p-1 rounded bg-orange-600 hover:bg-orange-700 text-white">⤼</button>
-                    <button title="Delete" aria-label={`Delete inject #${inject.number}`} onClick={() => onDeleteInject(inject.id)} className="p-1 rounded bg-red-600 hover:bg-red-700 text-white">🗑</button>
+                  </span>
+                  <div className="ml-auto flex items-center gap-2 text-sm text-gray-200">
+                    {renderStatusIcon(inject.status)}
+                    <span className="capitalize">{inject.status}</span>
                   </div>
                 </div>
-                <div className="mt-2 text-white text-sm whitespace-pre-wrap break-words">
+
+                <div className="mt-3 text-white text-sm whitespace-pre-wrap break-words">
                   <EditableField
                     inject={inject}
                     field="title"
@@ -692,41 +667,46 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                     className="whitespace-pre-wrap break-words"
                   />
                 </div>
-                {(inject.notes || inject.resources) && (
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300">
-                    <div className="whitespace-pre-wrap break-words">
-                      <span className="text-gray-400">Notes:</span>{' '}
-                      <EditableField
-                        inject={inject}
-                        field="notes"
-                        value={inject.notes || ''}
-                        displayValue={inject.notes || '-'}
-                        editingState={localEditingState}
-                        onStartEdit={handleStartEdit}
-                        onSaveEdit={handleSaveEdit}
-                        onCancelEdit={handleCancelEdit}
-                        onEditingValueChange={setLocalEditingValue}
-                        onKeyPress={handleKeyPress}
-                      />
-                    </div>
-                    <div className="truncate">
-                      <span className="text-gray-400">Resources:</span>{' '}
-                      <EditableField
-                        inject={inject}
-                        field="resources"
-                        value={inject.resources || ''}
-                        displayValue={inject.resources || '-'}
-                        editingState={localEditingState}
-                        onStartEdit={handleStartEdit}
-                        onSaveEdit={handleSaveEdit}
-                        onCancelEdit={handleCancelEdit}
-                        onEditingValueChange={setLocalEditingValue}
-                        onKeyPress={handleKeyPress}
-                        className="truncate"
-                      />
-                    </div>
+
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300">
+                  <div className="whitespace-pre-wrap break-words">
+                    <span className="text-gray-400">Notes:</span>{' '}
+                    <EditableField
+                      inject={inject}
+                      field="notes"
+                      value={inject.notes || ''}
+                      displayValue={inject.notes || '-'}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                    />
                   </div>
-                )}
+                  <div className="whitespace-pre-wrap break-words">
+                    <span className="text-gray-400">Resources:</span>{' '}
+                    <EditableField
+                      inject={inject}
+                      field="resources"
+                      value={inject.resources || ''}
+                      displayValue={inject.resources || '-'}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <span className="uppercase tracking-wide">Actions</span>
+                  </div>
+                  {renderActions(inject, sortedIndex, sortedInjects.length)}
+                </div>
               </div>
             )
           })}

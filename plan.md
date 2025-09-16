@@ -1,172 +1,82 @@
-ï»¿# EXCON Dashboard Development Plan
+# EXCON Dashboard Delivery Plan
 
-## Phase 1: Architecture Refactoring  **COMPLETED**
+_Last updated: 13 Sep 2025_
 
-### Objectives Achieved
-Successfully transformed the EXCON Dashboard from a monolithic 2,312-line file into a modern, maintainable React application with proper component architecture.
+## Snapshot
 
-### Key Accomplishments
-- ** Complete Code Transformation**: 2,312 lines  384 lines main file + 16 focused components
-- ** Modern React Architecture**: TypeScript, hooks, proper component structure
-- ** Component Extraction**: 12 specialized components with single responsibilities
-- ** Utility Systems**: 5 utility libraries for time, styling, validation, and import/export
-- ** Performance Optimization**: React.memo, useCallback, efficient re-renders
-- ** Type Safety**: 100% TypeScript coverage with strict type checking
-- ** Production Ready**: Successful builds, tests, and deployment verification
+**Recently Completed**
+- [x] Component refactor and strict TypeScript adoption across the dashboard.
+- [x] Session persistence (auto localStorage save + manual JSON import/export).
+- [x] Dashboard Admin panel with log export, PDF report, and reset actions.
+- [x] Activity logging wired into inject/resource/session actions and PDF output.
+- [x] Inline SVG/ASCII icon system for inject/resource visual cues.
 
-### Technical Achievements
-```
- Component Architecture
- Exercise Management (2 components)
- Data Entry Forms (2 components) 
- Dashboard Widgets (3 components)
- Timeline System (2 components)
- Import/Export Modals (2 components)
- Utility Libraries (5 files)
+**In Flight / Needs Attention**
+- [ ] Replace placeholder glyphs and clean import validation messaging.
+- [ ] Tablet/mobile responsive audit and accessibility sweep.
+- [ ] Automated testing scaffold (Jest + React Testing Library) with initial coverage.
+- [ ] Durable logging/persistence story beyond browser storage.
 
- Quality Metrics
- Average Component Size: 150 lines (vs 2,312)
- TypeScript Coverage: 100%
- Build Success: 
- Performance: Optimized
- Maintainability: Enterprise-ready
-```
-
-### Foundation Established
-- **Scalable Architecture**: Easy to add new features
-- **Developer Experience**: Fast navigation, debugging, and testing
-- **Code Quality**: Following React best practices
-- **Documentation**: Clean, organized project structure
+**Next Candidate Tasks**
+1. Harden import flows (clear errors/warnings, better duplicate surfacing).
+2. Finalise responsive layouts and keyboard shortcuts essential for controllers.
+3. Stand up the test harness and cover utilities (`timeUtils`, `validation`, `importExportUtils`).
+4. Scope central logging/export options (downloadable files, offline cache, agency sync path).
 
 ---
 
-## Phase 2: Essential System Core (Simplified Focus)
+## Phase 2 – Core System Reliability
 
-### Vision
-Transform the existing solid foundation into a production-ready, reliable emergency exercise management system that emergency management professionals can depend on for critical training exercises.
+### Objective A: Exercise Persistence & Templates
+- [x] Auto-save exercise snapshot to `localStorage` with restore banner.
+- [x] Manual JSON export/import for exercises (portable snapshot).
+- [ ] Exercise template library for quick start scenarios.
+- [ ] Version metadata on exports (schema version, timestamp, operator).
 
-### Core Philosophy
-Focus on making the current functionality bulletproof and essential rather than adding complex new features. Priority on reliability, usability, and AIDR compliance.
+### Objective B: Logging & Auditability
+- [x] Centralised client logger capturing error/task events.
+- [x] Export combined log text file from the UI.
+- [ ] Write logs to durable storage (download, filesystem, or server endpoint).
+- [ ] Structured activity view inside the app (sortable/filterable history).
+- [ ] Operator notes/annotations tied to injects and resources.
 
-### Essential Objectives
-1. **Exercise Persistence**: Save/load exercises for reuse and continuity
-2. **Operational Reliability**: Error tracking, logging, and robust error handling
-3. **Field Readiness**: Mobile/tablet optimization for field controllers
-4. **AIDR Compliance**: Templates, reports, and documentation aligned with standards
-5. **Production Quality**: Testing framework and comprehensive documentation
+### Objective C: Field Readiness (UX & Accessibility)
+- [ ] Responsive layout tuned for 12" tablets in landscape/portrait.
+- [ ] Keyboard shortcuts for timer control and quick status updates.
+- [ ] High-contrast + motion-reduced theme switches for field conditions.
+- [ ] Offline/restore banner UX polish with clear messaging.
 
-### Phase 2 Development Plan
-
-####  **Priority 1: Core System Stability (Month 1)**
-- **Exercise Save/Load**: Persistent exercise sessions using localStorage initially
-- **Exercise Templates**: Save and reuse common exercise configurations
-- **Error Logging System**: Implement error.log for tracking and fixing issues
-- **Task Logging System**: Implement task.log for completed work tracking
-- **Print/PDF Export**: Print-friendly exercise reports for documentation  (COMPLETED)
-- **Dashboard Admin Panel**: Centralize Export/Import Exercise, Export Logs, PDF Report, Reset  (COMPLETED)
-- **Activity Timeline**: Capture user actions for reporting/audit  (COMPLETED)
-
-####  **Priority 2: Field Operations (Month 2)**
-- **Mobile Responsive Design**: Optimize for tablets and phones used in field
-- **Keyboard Shortcuts**: Quick actions (spacebar for start/stop, etc.)
-- **Drag & Drop Interface**: Visual reordering of injects and resources
-- **Exercise Notes**: Add comments and observations during exercise execution
-- **Enhanced Status Indicators**: Clear visual feedback for exercise state
-
-####  **Priority 3: Production Foundation (Month 3)**
-- **Testing Framework**: Jest setup with critical component tests
-- **Enhanced Error Handling**: User-friendly error messages and recovery
-- **Performance Optimization**: Handle larger exercise datasets efficiently
-- **Documentation**: User guides and operational procedures
-- **Browser Compatibility**: Ensure reliable operation across browsers
-
-### Additional Features for Future Consideration
-
-####  **AIDR-Aligned Exercise Management**
-- **Participant Roster**: Track who's involved in exercises
-- **Exercise Objectives**: Define and track if goals were met
-- **Exercise Phases**: Setup, execution, and debrief phase management
-- **Evaluation Forms**: Post-exercise assessment templates
-
-####  **Communication & Documentation**
-- **Message Log**: Track all communications during exercise
-- **Action Items Tracker**: Follow-up tasks from exercises
-- **Hot Wash Notes**: Immediate post-exercise feedback capture
-- **Lessons Learned**: Structured improvement documentation
-
-####  **Resource Libraries**
-- **Scenario Library**: Pre-built emergency scenarios
-- **Resource Database**: Common emergency resources and contacts
-- **Exercise Calendar**: Schedule and track upcoming exercises
-- **Contact Management**: Key personnel database for exercises
-
-### Development Timeline
-
-#### **Month 1: Core Stability**
--  Exercise save/load functionality
--  Exercise templates system  
--  Logging systems (error.log, task.log)
--  Print/PDF export capability
--  Basic testing framework
-
-#### **Month 2: Field Optimization**
--  Mobile responsive interface
--  Keyboard shortcuts
--  Drag & drop functionality
--  Exercise notes system
--  Status indicator improvements
-
-#### **Month 3: Production Ready**
--  Comprehensive testing
--  Error handling improvements
--  Performance optimization
--  Documentation completion
--  User acceptance testing
-
-### Success Criteria
-
-#### **Operational Reliability**
-- Exercises can be saved, loaded, and resumed reliably
-- All errors are logged and trackable for resolution
-- System performs consistently across different devices and browsers
-- Clear audit trail of all exercise activities
-
-#### **User Effectiveness**
-- Emergency controllers can operate system efficiently on tablets in field
-- Exercise setup time is minimized through templates
-- Print-friendly reports support post-exercise analysis
-- System integrates smoothly with existing AIDR processes
-
-#### **Production Quality**
-- Comprehensive test coverage of critical functionality
-- Professional documentation for users and developers
-- Stable performance with realistic exercise datasets
-- Positive feedback from emergency management professionals
-
-### Technology Approach
-
-#### **Current Proven Foundation**
-- Next.js 15.5.0 + React 19.1.0
-- TypeScript with strict typing
-- Tailwind CSS 4.0
-- Component-based architecture
-
-#### **Minimal Essential Additions**
-- **Testing**: Jest + React Testing Library (focused on critical paths)
-- **Persistence**: LocalStorage initially, future database migration path
-- **Logging**: Simple file-based logging system
-- **Documentation**: User guides and technical documentation
-
-### Risk Mitigation
-- **Incremental approach**: Each month delivers working, testable improvements
-- **User feedback loops**: Regular testing with emergency management professionals  
-- **Backwards compatibility**: No breaking changes to existing functionality
-- **Simple technology choices**: Avoid complex dependencies that could fail
+### Objective D: Quality Foundation
+- [ ] Jest + React Testing Library setup; add CI lint/test scripts.
+- [ ] Unit coverage for time parsing/formatting, validation, import/export flows.
+- [ ] Component smoke tests for InjectList, ResourceRequestBoard, and Timeline.
+- [ ] Performance profiling against 500+ inject / 200+ resource datasets.
+- [ ] Error boundaries around modals/import flows with operator-friendly messaging.
 
 ---
 
-## Project Status: Ready for Phase 2
+## Phase 3 – Production Hardening
+- [ ] Tablet-first operator mode (simplified controls, large hit targets).
+- [ ] Multi-session management (open/save multiple exercises, templates gallery).
+- [ ] Observer/evaluator workflow exports (CSV/PDF tailored views).
+- [ ] Browser compatibility matrix + load testing sign-off.
+- [ ] Deployment pipeline + release checklist (branching, tagging, documentation).
 
-The EXCON Dashboard now has a **production-ready foundation** with modern React architecture, complete TypeScript coverage, and enterprise-quality code organization. A bottom-page Dashboard Admin panel consolidates exercise management (export/import), logging, reporting (PDF), and reset controls. PDF reports include MSE, Resources, Logs, and an Activity Timeline. This solid base enables rapid development of advanced features while maintaining code quality and system reliability.
+---
 
-**The platform is positioned to become the leading digital solution for emergency exercise management.**
+## Backlog & Future Considerations
+- Participant roster management with role assignments.
+- Exercise objectives tracking and evaluation scoring.
+- Message log / communications board integrated with inject timeline.
+- Hot wash + lessons learned capture tied to post-exercise reporting.
+- Scenario/resource libraries for rapid exercise build-out.
+- Calendar of exercises with shared agency access.
+
+---
+
+## Tracking & Artefacts
+- `task.log` – append entries as work lands.
+- `error.log` – record defects and follow-up items until automated pipelines exist.
+- `support docs/` – maintain reference materials used for alignment and imports.
+
+_Review and update this plan at the start/end of each working session to keep Phase 2 moving._
