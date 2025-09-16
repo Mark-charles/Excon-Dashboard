@@ -67,7 +67,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showInPerson: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-blue-400 text-sm">{getInjectTypeGlyph('in person')} In Person</span>
+              <span className="text-blue-400 text-sm flex items-center gap-2">{getInjectTypeGlyph('in person', 'svg', 'small')} In Person</span>
             </label>
             <label className="flex items-center">
               <input
@@ -76,7 +76,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showRadioPhone: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-green-400 text-sm">{getInjectTypeGlyph('radio/phone')} Radio/Phone</span>
+              <span className="text-green-400 text-sm flex items-center gap-2">{getInjectTypeGlyph('radio/phone', 'svg', 'small')} Radio/Phone</span>
             </label>
             <label className="flex items-center">
               <input
@@ -85,7 +85,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showElectronic: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-purple-400 text-sm">{getInjectTypeGlyph('electronic')} Electronic</span>
+              <span className="text-purple-400 text-sm flex items-center gap-2">{getInjectTypeGlyph('electronic', 'svg', 'small')} Electronic</span>
             </label>
             <label className="flex items-center">
               <input
@@ -94,7 +94,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showMapInject: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-red-400 text-sm">{getInjectTypeGlyph('map inject')} Map Inject</span>
+              <span className="text-red-400 text-sm flex items-center gap-2">{getInjectTypeGlyph('map inject', 'svg', 'small')} Map Inject</span>
             </label>
             <label className="flex items-center">
               <input
@@ -103,7 +103,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showOther: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-orange-400 text-sm">{getInjectTypeGlyph('other')} Other</span>
+              <span className="text-orange-400 text-sm flex items-center gap-2">{getInjectTypeGlyph('other', 'svg', 'small')} Other</span>
             </label>
           </div>
         </div>
@@ -119,7 +119,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showRequestedStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-gray-400 text-sm">{getResourceStatusGlyph('requested')} Requested</span>
+              <span className="text-gray-400 text-sm flex items-center gap-2">{getResourceStatusGlyph('requested', 'svg', 'small')} Requested</span>
             </label>
             <label className="flex items-center">
               <input
@@ -128,7 +128,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showTaskedStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-amber-400 text-sm">{getResourceStatusGlyph('tasked')} Tasked</span>
+              <span className="text-amber-400 text-sm flex items-center gap-2">{getResourceStatusGlyph('tasked', 'svg', 'small')} Tasked</span>
             </label>
             <label className="flex items-center">
               <input
@@ -137,7 +137,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showEnrouteStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-blue-400 text-sm">{getResourceStatusGlyph('enroute')} Enroute</span>
+              <span className="text-blue-400 text-sm flex items-center gap-2">{getResourceStatusGlyph('enroute', 'svg', 'small')} Enroute</span>
             </label>
             <label className="flex items-center">
               <input
@@ -146,7 +146,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showArrivedStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-green-400 text-sm">{getResourceStatusGlyph('arrived')} Arrived</span>
+              <span className="text-green-400 text-sm flex items-center gap-2">{getResourceStatusGlyph('arrived', 'svg', 'small')} Arrived</span>
             </label>
             <label className="flex items-center">
               <input
@@ -155,7 +155,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ showCancelledStatus: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-red-400 text-sm">{getResourceStatusGlyph('cancelled')} Cancelled</span>
+              <span className="text-red-400 text-sm flex items-center gap-2">{getResourceStatusGlyph('cancelled', 'svg', 'small')} Cancelled</span>
             </label>
           </div>
         </div>

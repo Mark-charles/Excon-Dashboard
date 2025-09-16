@@ -23,3 +23,9 @@
 [2025-09-12 20:32:17] COMPLETED Phase 6 (partial): Inline SVG icons - Added inline SVG icons and integrated into Timeline + FilterBar
 [2025-09-12 21:04:40] COMPLETED Icon updates - Added resource type icons (truck/ambulance/helicopter/police/fire/medical), status rings, and global icon mode via NEXT_PUBLIC_ICON_MODE
 [2025-09-12 21:42:12] COMPLETED Code review and hardening plan - Documentation updated; plan marked completed; lint clean
+[2025-09-13 21:01:02] COMPLETED MSE column compacting - Reduced column widths and button sizes to remove horizontal scroll
+[2025-09-13 21:01:02] COMPLETED Dashboard Admin panel - Added Export/Import Exercise, Export Logs, Export Report (PDF), Reset
+[2025-09-13 21:01:02] COMPLETED Rename session actions - Export/Import Session -> Exercise
+[2025-09-13 21:01:02] COMPLETED PDF report enhancements - MSE, Resources, Logs, Activity Timeline; timestamped header
+[2025-09-13 21:01:02] COMPLETED Activity logging - Tracked inject/resource/session/report actions and persisted in session JSON
+[2025-09-13 21:01:02] COMPLETED Cleanup - Removed old Session Management block from dashboard top

@@ -3,14 +3,34 @@ import type { InjectType, ResourceItem, ResourceKind, ResourceStatus } from '../
 import { iconMode as defaultIconMode } from './iconConfig'
 
 export type IconMode = 'ascii' | 'svg'
+export type IconSize = 'small' | 'medium' | 'large'
 
-const svg = (paths: React.ReactNode, viewBox = '0 0 24 24') => (
-  <svg width="18" height="18" viewBox={viewBox} fill="currentColor" aria-hidden>
-    {paths}
-  </svg>
-)
+const getIconSize = (size: IconSize): number => {
+  switch (size) {
+    case 'small': return 12
+    case 'medium': return 16
+    case 'large': return 20
+  }
+}
 
-export const getInjectTypeGlyph = (type: InjectType, mode: IconMode = defaultIconMode): React.ReactNode => {
+const svg = (paths: React.ReactNode, viewBox = '0 0 24 24', size: IconSize = 'medium') => {
+  const pixelSize = getIconSize(size)
+  return (
+    <svg 
+      width={pixelSize} 
+      height={pixelSize} 
+      viewBox={viewBox} 
+      fill="currentColor" 
+      aria-hidden 
+      className="flex-shrink-0"
+      style={{ minWidth: pixelSize, minHeight: pixelSize }}
+    >
+      {paths}
+    </svg>
+  )
+}
+
+export const getInjectTypeGlyph = (type: InjectType, mode: IconMode = defaultIconMode, size: IconSize = 'medium'): React.ReactNode => {
   if (mode === 'ascii') {
     switch (type) {
       case 'in person': return '[IP]'
@@ -20,21 +40,74 @@ export const getInjectTypeGlyph = (type: InjectType, mode: IconMode = defaultIco
       default: return '[O]'
     }
   }
+  
   switch (type) {
     case 'in person':
-      return svg(<path d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5Zm0 2c-4.418 0-8 2.239-8 5v2h16v-2c0-2.761-3.582-5-8-5Z" />)
+      // Simple person silhouette - circle head + body
+      return svg(
+        <>
+          <circle cx="12" cy="8" r="3" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M6 20v-4a6 6 0 0112 0v4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'radio/phone':
-      return svg(<path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24 11.05 11.05 0 003.46.55 1 1 0 011 1v3.25a1 1 0 01-1 1C10.2 21.75 2.25 13.8 2.25 3.75a1 1 0 011-1H6.5a1 1 0 011 1 11.05 11.05 0 00.55 3.46 1 1 0 01-.24 1.02l-2.2 2.2Z" />)
+      // Simple radio tower - vertical line + signal waves
+      return svg(
+        <>
+          <path d="M12 3v18" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M8 7l8-4" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M16 7l-8-4" strokeWidth="1.5" stroke="currentColor"/>
+          <circle cx="9" cy="9" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="15" cy="9" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'electronic':
-      return svg(<path d="M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1Zm9 7L4 7h16l-9 5Zm0 2l9-5v9H3V9l9 5Z" />)
+      // Simple monitor - rectangle + power indicator
+      return svg(
+        <>
+          <rect x="4" y="5" width="16" height="11" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M8 21h8" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M12 16v5" strokeWidth="1.5" stroke="currentColor"/>
+          <circle cx="18" cy="7" r="1.5" fill="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'map inject':
-      return svg(<path d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7Zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5Z" />)
+      // Simple location pin - teardrop + crosshairs
+      return svg(
+        <>
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="12" cy="9" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 7v4" strokeWidth="1" stroke="currentColor"/>
+          <path d="M10 9h4" strokeWidth="1" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     default:
-      return svg(<circle cx="12" cy="12" r="6" />)
+      // Simple alert - triangle + exclamation
+      return svg(
+        <>
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 9v4" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M12 17h.01" strokeWidth="1.5" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
   }
 }
 
-export const getResourceStatusGlyph = (status: ResourceStatus, mode: IconMode = defaultIconMode): React.ReactNode => {
+export const getResourceStatusGlyph = (status: ResourceStatus, mode: IconMode = defaultIconMode, size: IconSize = 'medium'): React.ReactNode => {
   if (mode === 'ascii') {
     switch (status) {
       case 'requested': return '[REQ]'
@@ -45,19 +118,71 @@ export const getResourceStatusGlyph = (status: ResourceStatus, mode: IconMode = 
       default: return '[REQ]'
     }
   }
+  
   switch (status) {
     case 'requested':
-      return svg(<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2" />)
+      // Simple clock - circle + clock hands
+      return svg(
+        <>
+          <circle cx="12" cy="12" r="9" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 7v5l3 3" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'tasked':
-      return svg(<path d="M12 3l10 18H2L12 3Zm0 6v6m0 4h.01" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />)
+      // Simple assignment - clipboard + checkmark
+      return svg(
+        <>
+          <path d="M8 2v4h8V2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <rect x="4" y="4" width="16" height="16" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M9 12l2 2 4-4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'enroute':
-      return svg(<path d="M4 12h12M12 6l6 6-6 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />)
+      // Simple arrow - directional movement
+      return svg(
+        <>
+          <path d="M5 12h14" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M12 5l7 7-7 7" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'arrived':
-      return svg(<><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M8 12l3 3 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></>)
+      // Simple location pin - solid pin shape
+      return svg(
+        <>
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor"/>
+          <circle cx="12" cy="9" r="2" fill="white"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'cancelled':
-      return svg(<><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M8 8l8 8M16 8l-8 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></>)
+      // Simple X - crossed lines
+      return svg(
+        <>
+          <circle cx="12" cy="12" r="9" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M15 9l-6 6" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M9 9l6 6" strokeWidth="1.5" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     default:
-      return svg(<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2" />)
+      return svg(
+        <circle cx="12" cy="12" r="9" strokeWidth="1.5" stroke="currentColor" fill="none"/>,
+        '0 0 24 24',
+        size
+      )
   }
 }
 
@@ -73,13 +198,15 @@ export const inferResourceKind = (label: string): ResourceKind => {
   return 'unknown'
 }
 
-// Resource type icons
+// Simple, professional resource type icons
 export const getResourceTypeGlyph = (
   resource: Pick<ResourceItem, 'label' | 'kind'> | ResourceKind | string,
-  mode: IconMode = defaultIconMode
+  mode: IconMode = defaultIconMode,
+  size: IconSize = 'medium'
 ): React.ReactNode => {
   const kinds: ReadonlyArray<ResourceKind> = ['truck','ambulance','helicopter','police','fire','medical','other','unknown']
   const isResourceKind = (v: string): v is ResourceKind => (kinds as ReadonlyArray<string>).includes(v)
+  
   if (mode === 'ascii') {
     const k: ResourceKind = typeof resource === 'string'
       ? (isResourceKind(resource) ? resource : inferResourceKind(resource))
@@ -94,31 +221,108 @@ export const getResourceTypeGlyph = (
       default: return '[RES]'
     }
   }
+  
   const kind: ResourceKind = typeof resource === 'string'
     ? (isResourceKind(resource) ? resource : inferResourceKind(resource))
     : (resource.kind ?? inferResourceKind(resource.label))
 
   switch (kind) {
     case 'truck':
-      // Simple truck profile
-      return svg(<path d="M3 13h9v-3h4l3 3v4h-1a2 2 0 11-4 0H9a2 2 0 11-4 0H3v-4Zm13 0h3l-2-2h-1v2Z" />)
+      // Simple truck silhouette - rectangle + wheels
+      return svg(
+        <>
+          <rect x="4" y="10" width="16" height="6" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="8" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="16" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M4 10V8a2 2 0 012-2h4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <rect x="10" y="8" width="2" height="2" fill="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'ambulance':
-      // Ambulance with cross
-      return svg(<><path d="M3 13h9v-3h4l3 3v4h-1a2 2 0 11-4 0H9a2 2 0 11-4 0H3v-4Zm13 0h3l-2-2h-1v2Z" /><path d="M7 9h2v-2h2v2h2v2h-2v2H9v-2H7V9Z"/></>)
+      // Simple ambulance - truck + medical cross
+      return svg(
+        <>
+          <rect x="4" y="10" width="16" height="6" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="8" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="16" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M4 10V8a2 2 0 012-2h4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 9v2" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M11 10h2" strokeWidth="1.5" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'helicopter':
-      // Helicopter side view
-      return svg(<><path d="M3 13h8a3 3 0 005.196 2H21v2h-2v1h-2v-1h-3a5 5 0 01-4.472-2.776L3 14v-1Z" /><path d="M2 7h20v2H2z"/></>)
+      // Simple helicopter - rotor + body
+      return svg(
+        <>
+          <path d="M6 12h12" strokeWidth="1.5" stroke="currentColor"/>
+          <rect x="8" y="11" width="8" height="4" rx="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 11V8" strokeWidth="1.5" stroke="currentColor"/>
+          <circle cx="12" cy="8" r="1" fill="currentColor"/>
+          <path d="M12 15v2" strokeWidth="1.5" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'police':
-      // Badge
-      return svg(<path d="M12 2l4 2 4-2v8c0 6-8 12-8 12S4 16 4 10V2l4 2 4-2Z" />)
+      // Simple police car - truck + badge
+      return svg(
+        <>
+          <rect x="4" y="10" width="16" height="6" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="8" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="16" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M4 10V8a2 2 0 012-2h4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 6l1 2h2l-1 2-1-2-1 2z" fill="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'fire':
-      // Flame
-      return svg(<path d="M12 2s4 4 4 8-4 6-4 8-4-2-4-6 4-6 4-10Z" />)
+      // Simple fire truck - truck + ladder
+      return svg(
+        <>
+          <rect x="4" y="10" width="16" height="6" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="8" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="16" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M4 10V8a2 2 0 012-2h4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M10 6h4" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M12 6v4" strokeWidth="1.5" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     case 'medical':
-      // Medical cross
-      return svg(<path d="M10 2h4v6h6v4h-6v6h-4v-6H4V8h6V2Z" />)
+      // Simple medical - circle + medical cross
+      return svg(
+        <>
+          <circle cx="12" cy="12" r="9" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M12 8v8" strokeWidth="1.5" stroke="currentColor"/>
+          <path d="M8 12h8" strokeWidth="1.5" stroke="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
+      
     default:
-      // Generic cube
-      return svg(<path d="M4 7l8-5 8 5v10l-8 5-8-5V7Zm8-3l-6 3.5L12 11l6-3.5L12 4Z" />)
+      // Simple vehicle - generic rectangle + wheels
+      return svg(
+        <>
+          <rect x="4" y="10" width="16" height="6" rx="1" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="8" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="16" cy="18" r="2" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <path d="M4 10V8a2 2 0 012-2h4" strokeWidth="1.5" stroke="currentColor" fill="none"/>
+          <circle cx="12" cy="12" r="1" fill="currentColor"/>
+        </>,
+        '0 0 24 24',
+        size
+      )
   }
 }

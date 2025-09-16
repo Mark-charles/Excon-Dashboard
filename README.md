@@ -10,7 +10,8 @@ The EXCON Dashboard provides real-time exercise control capabilities including:
 - **Resource Tracking**: Monitor emergency resource requests, deployment, and status
 - **Interactive Timeline**: Visual representation of exercise events and milestones
 - **Import/Export**: Bulk loading of scenarios and resources from spreadsheets
-- **Real-time Documentation**: Automatic logging of all exercise events
+- **Admin Panel**: Export/Import Exercise JSON, Export Logs, PDF report, Reset
+- **Real-time Documentation**: Automatic logging of actions and events
 
 ## Technology Stack
 
@@ -123,6 +124,7 @@ npm start
 - Data validation with error reporting
 - Duplicate detection and handling
 - Preview functionality before import
+ - Admin panel actions: Export/Import Exercise JSON, Export Logs, PDF Report, Reset Dashboard
 
 ## Standards Compliance
 
@@ -172,7 +174,7 @@ Default icons are inline SVGs for clarity and performance. Set `NEXT_PUBLIC_ICON
 
 ## Persistence
 
-Session state (exercise info, timer, injects, resources) persists to `localStorage`. A restore banner appears on load if a previous session is found. Use Export/Import Session buttons on the Dashboard to backup or load JSON.
+Session state (exercise info, timer, injects, resources, activity) persists to `localStorage`. A restore banner appears on load if a previous session is found. Use the Dashboard Admin panel (bottom of the page) to Export/Import Exercise JSON, Export Logs, export a PDF Report, or Reset the Dashboard.
 
 ## How To Test
 

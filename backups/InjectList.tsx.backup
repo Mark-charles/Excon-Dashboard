@@ -4,7 +4,6 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import type { InjectItem, InjectType, EditingState } from '../shared/types'
 import { formatHMS, parseHMS, isCurrentInject } from '../../utils/timeUtils'
 import { getInjectTypeGlyph } from '../../utils/iconHelpers'
-import { getInjectTypeTextColor } from '../../utils/styleUtils'
 
 interface InjectListProps {
   injects: InjectItem[]
@@ -136,7 +135,6 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
 }) => {
   const [localEditingField, setLocalEditingField] = useState<{id: string, field: string} | null>(null)
   const [localEditingValue, setLocalEditingValue] = useState<string>('')
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
   // Virtual scrolling state
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -268,40 +266,22 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
             Master Schedule of Events
           </h3>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-r from-blue-900/30 to-slate-800/50 px-5 py-3 rounded-xl border border-blue-500/30 backdrop-blur-sm">
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                <span className="text-blue-300 font-medium">{injects.length} Total</span>
-              </div>
-              <div className="w-px h-4 bg-gray-600"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-green-300 font-medium">{injects.filter(i => i.status === 'completed').length} Complete</span>
-              </div>
-              <div className="w-px h-4 bg-gray-600"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                <span className="text-red-300 font-medium">{injects.filter(i => i.status === 'missed').length} Missed</span>
-              </div>
+        <div className="bg-gradient-to-r from-blue-900/30 to-slate-800/50 px-5 py-3 rounded-xl border border-blue-500/30 backdrop-blur-sm">
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+              <span className="text-blue-300 font-medium">{injects.length} Total</span>
             </div>
-          </div>
-          <div className="inline-flex rounded-lg overflow-hidden border border-gray-700">
-            <button
-              className={`px-3 py-1 text-xs ${viewMode==='table'?'bg-blue-600 text-white':'bg-gray-800 text-gray-300'} hover:bg-blue-600 hover:text-white`}
-              onClick={() => setViewMode('table')}
-              aria-label="Table view"
-            >
-              Table
-            </button>
-            <button
-              className={`px-3 py-1 text-xs ${viewMode==='cards'?'bg-blue-600 text-white':'bg-gray-800 text-gray-300'} hover:bg-blue-600 hover:text-white`}
-              onClick={() => setViewMode('cards')}
-              aria-label="Card view"
-            >
-              Cards
-            </button>
+            <div className="w-px h-4 bg-gray-600"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              <span className="text-green-300 font-medium">{injects.filter(i => i.status === 'completed').length} Complete</span>
+            </div>
+            <div className="w-px h-4 bg-gray-600"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+              <span className="text-red-300 font-medium">{injects.filter(i => i.status === 'missed').length} Missed</span>
+            </div>
           </div>
         </div>
       </div>
@@ -318,7 +298,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
           <div className="text-xl font-medium text-gray-300 mb-2">No Schedule Items</div>
           <div className="text-gray-400">Items will appear here when added to the Master Schedule of Events</div>
         </div>
-      ) : viewMode === 'table' ? (
+      ) : (
         <div className="overflow-x-auto">
           <div
             ref={scrollContainerRef}
@@ -332,19 +312,19 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
             {/* MSE Header */}
             <div className="sticky top-0 bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 border-b-2 border-blue-500/70 z-10 shadow-lg backdrop-blur-sm" role="rowgroup">
               <div
-                className="grid grid-cols-10 gap-2 px-3 py-4 text-sm font-bold text-white tracking-wide"
+                className="grid grid-cols-10 gap-2 lg:gap-4 px-3 lg:px-4 py-4 text-sm font-bold text-white tracking-wide"
                 style={{
-                  gridTemplateColumns: '44px 68px 100px 100px 106px 1fr 150px 100px 32px 72px'
+                  gridTemplateColumns: '70px 90px 1fr 110px 110px 120px 180px 110px 90px 130px'
                 }}
                 role="row"
                 aria-rowindex={1}
               >
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>Number</div>
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="ascending">Elapsed<br/>Time</div>
+                <div className="text-left pl-2 text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject</div>
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>From</div>
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>To</div>
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>Type</div>
-                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject</div>
                 <div className="text-left pl-2 text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Additional Notes/Actions</div>
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Resources</div>
                 <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Completed</div>
@@ -362,21 +342,17 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
 
               {visibleItems.items.map((inject, index) => {
                 const sortedIndex = visibleItems.startIndex + index
-                const isUpcoming = inject.status !== 'completed' && inject.status !== 'missed' && inject.status !== 'skipped' && currentSeconds >= (inject.dueSeconds - 60) && currentSeconds < inject.dueSeconds
                 return (
                 <div
                   key={inject.id}
                   className={`
-                    grid grid-cols-10 gap-2 px-3 py-5 border-b border-gray-700/40 hover:bg-blue-900/10 hover:border-blue-600/30 transition-all duration-200
-                    ${inject.status === 'completed' ? 'bg-emerald-900/30' : ''}
-                    ${inject.status === 'missed' ? 'bg-red-900/30' : ''}
-                    ${inject.status !== 'completed' && inject.status !== 'missed' && currentSeconds < inject.dueSeconds ? 'bg-gray-900/20' : ''}
+                    grid grid-cols-10 gap-2 lg:gap-4 px-3 lg:px-4 py-5 border-b border-gray-700/40 hover:bg-blue-900/10 hover:border-blue-600/30 transition-all duration-200
+                    ${isCurrentInject(currentSeconds, inject.dueSeconds) ? 'bg-yellow-900/20 border-yellow-400/50 shadow-yellow-400/20 shadow-sm' : ''}
                     ${inject.status === 'skipped' ? 'opacity-60' : ''}
-                    ${sortedIndex % 2 === 0 ? 'bg-slate-900/40' : 'bg-gray-900/20'}
-                    ${isUpcoming ? 'ring-2 ring-yellow-400/60 animate-pulse' : ''}
+                    ${sortedIndex % 2 === 0 ? 'bg-slate-900/50' : 'bg-gray-900/30'}
                   `}
                   style={{
-                    gridTemplateColumns: '44px 68px 100px 100px 106px 1fr 150px 100px 32px 72px'
+                    gridTemplateColumns: '70px 90px 1fr 110px 110px 120px 180px 110px 90px 130px'
                   }}
                   role="row"
                   aria-rowindex={sortedIndex + 2}
@@ -414,6 +390,23 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                       onEditingValueChange={setLocalEditingValue}
                       onKeyPress={handleKeyPress}
                       className="font-mono text-green-400 font-medium text-sm whitespace-nowrap"
+                    />
+                  </div>
+                    
+                  {/* Inject Title */}
+                  <div className="flex items-start justify-start pl-2" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="title"
+                      value={inject.title}
+                      displayValue={inject.title}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="text-white text-sm leading-relaxed whitespace-pre-wrap break-words w-full"
                     />
                   </div>
                     
@@ -472,11 +465,11 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                       <button
                         type="button"
                         onClick={() => handleStartEdit(inject.id, 'type', inject.type)}
-                        className={`cursor-pointer inline-flex items-center gap-2 px-2 py-1 rounded-md bg-gray-700/50 hover:bg-gray-600/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 w-full justify-center ${getInjectTypeTextColor(inject.type)}`}
+                        className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-700/50 hover:bg-gray-600/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 w-full justify-center"
                         title="Click to edit inject type"
                         aria-label={`Edit type for inject #${inject.number}`}
                       >
-                        <span className="text-sm drop-shadow-md">{getInjectTypeGlyph(inject.type, 'svg', 'small')}</span>
+                        <span className="text-sm">{getInjectTypeGlyph(inject.type, 'svg', 'small')}</span>
                         <span className="capitalize text-sm font-medium text-gray-200">
                           {inject.type === 'in person' ? 'Face to Face' :
                            inject.type === 'radio/phone' ? 'Radio/Phone' :
@@ -485,23 +478,6 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                         </span>
                       </button>
                     )}
-                  </div>
-
-                  {/* Inject Title (moved after type) */}
-                  <div className="flex items-start justify-start pl-2" role="gridcell">
-                    <EditableField
-                      inject={inject}
-                      field="title"
-                      value={inject.title}
-                      displayValue={inject.title}
-                      editingState={localEditingState}
-                      onStartEdit={handleStartEdit}
-                      onSaveEdit={handleSaveEdit}
-                      onCancelEdit={handleCancelEdit}
-                      onEditingValueChange={setLocalEditingValue}
-                      onKeyPress={handleKeyPress}
-                      className="text-white text-sm leading-relaxed whitespace-pre-wrap break-words w-full"
-                    />
                   </div>
 
                   {/* Additional Notes/Actions */}
@@ -561,25 +537,24 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                     </div>
                   </div>
                     
-                  {/* Completed Status (icon-only) */}
+                  {/* Completed Status */}
                   <div className="flex justify-center items-center" role="gridcell">
-                    {inject.status === 'completed' ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-emerald-400" aria-label="Completed" title="Completed">
-                        <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" fill="none"/>
-                      </svg>
-                    ) : inject.status === 'missed' ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-red-400" aria-label="Missed" title="Missed">
-                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    ) : inject.status === 'skipped' ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-orange-400" aria-label="Skipped" title="Skipped">
-                        <path d="M5 12h14" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                    ) : (
-                      <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400" aria-label="Pending" title="Pending">
-                        <circle cx="5" cy="5" r="4" fill="currentColor"/>
-                      </svg>
-                    )}
+                    <div className="flex items-center justify-center gap-2 px-3 py-2 rounded-full bg-gray-700/30">
+                      <div className={`w-3 h-3 rounded-full ${
+                        inject.status === 'completed' ? 'bg-green-500 shadow-green-500/50 shadow-sm' :
+                        inject.status === 'missed' ? 'bg-red-500 animate-pulse shadow-red-500/50 shadow-sm' :
+                        inject.status === 'skipped' ? 'bg-orange-500 shadow-orange-500/50 shadow-sm' : 'bg-gray-400'
+                      }`}></div>
+                      <span className={`text-sm font-medium ${
+                        inject.status === 'completed' ? 'text-green-400' :
+                        inject.status === 'missed' ? 'text-red-400' :
+                        inject.status === 'skipped' ? 'text-orange-400' : 'text-gray-400'
+                      }`}>
+                        {inject.status === 'completed' ? 'Yes' :
+                         inject.status === 'missed' ? 'Missed' :
+                         inject.status === 'skipped' ? 'Skipped' : 'No'}
+                      </span>
+                    </div>
                   </div>
                     
                   {/* Actions */}
@@ -589,7 +564,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                         type="button"
                         onClick={() => onMoveInject(inject.id, 'up')}
                         disabled={sortedIndex === 0}
-                        className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         title="Move up"
                         aria-label={`Move inject #${inject.number} up`}
                       >
@@ -601,7 +576,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                         type="button"
                         onClick={() => onMoveInject(inject.id, 'down')}
                         disabled={sortedIndex === injects.length - 1}
-                        className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         title="Move down"
                         aria-label={`Move inject #${inject.number} down`}
                       >
@@ -613,7 +588,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                         type="button"
                         onClick={() => onToggleInjectStatus(inject.id)}
                         disabled={inject.status === 'skipped'}
-                        className={`p-1 rounded-md transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                        className={`p-2 rounded-md transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                           inject.status === 'completed'
                             ? 'bg-gray-600 hover:bg-gray-700 text-white'
                             : 'bg-green-600 hover:bg-green-700 text-white'
@@ -631,7 +606,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                         type="button"
                         onClick={() => onSkipInject(inject.id)}
                         disabled={inject.status === 'skipped' || inject.status === 'completed'}
-                        className="p-1 rounded-md bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                        className="p-2 rounded-md bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                         title="Skip"
                         aria-label={`Skip inject #${inject.number}`}
                       >
@@ -640,7 +615,7 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
                       <button
                         type="button"
                         onClick={() => onDeleteInject(inject.id)}
-                        className="p-1 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                        className="p-2 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                         title="Delete"
                         aria-label={`Delete inject #${inject.number}`}
                       >
@@ -653,83 +628,6 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
               })}
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {sortedInjects.map((inject, sortedIndex) => {
-            const isUpcoming = inject.status !== 'completed' && inject.status !== 'missed' && inject.status !== 'skipped' && currentSeconds >= (inject.dueSeconds - 60) && currentSeconds < inject.dueSeconds
-            return (
-              <div key={inject.id} className={`rounded-xl border border-gray-700/60 bg-gray-800/40 p-3 transition-colors ${inject.status==='completed'?'bg-emerald-900/30':''} ${inject.status==='missed'?'bg-red-900/30':''} ${inject.status!=='completed'&&inject.status!=='missed'&&currentSeconds<inject.dueSeconds?'bg-gray-900/20':''} ${isUpcoming?'ring-2 ring-yellow-400/60 animate-pulse':''}`}>
-                <div className="flex flex-wrap items-start gap-2">
-                  <div className="text-xs text-gray-400 font-mono">{formatHMS(inject.dueSeconds)}</div>
-                  <div className="text-xs text-gray-400">#{inject.number}</div>
-                  <div className="text-xs text-gray-400">From: <span className="text-gray-200">{inject.from || '-'}</span></div>
-                  <div className="text-xs text-gray-400">To: <span className="text-gray-200">{inject.to || 'All'}</span></div>
-                  <div className={`text-xs inline-flex items-center gap-1 ${getInjectTypeTextColor(inject.type)}`}>
-                    <span>{getInjectTypeGlyph(inject.type, 'svg', 'small')}</span>
-                    <span className="capitalize">{inject.type}</span>
-                  </div>
-                  <div className="ml-auto flex items-center gap-1">
-                    <button title="Move up" aria-label={`Move inject #${inject.number} up`} onClick={() => onMoveInject(inject.id, 'up')} className="p-1 text-xs text-gray-400 hover:text-white">▲</button>
-                    <button title="Move down" aria-label={`Move inject #${inject.number} down`} onClick={() => onMoveInject(inject.id, 'down')} className="p-1 text-xs text-gray-400 hover:text-white">▼</button>
-                    <button title={inject.status==='completed'?'Mark incomplete':'Mark complete'} aria-label={inject.status==='completed'?`Mark inject #${inject.number} incomplete`:`Mark inject #${inject.number} complete`} onClick={() => onToggleInjectStatus(inject.id)} className={`p-1 rounded ${inject.status==='completed'?'bg-gray-600 hover:bg-gray-700':'bg-green-600 hover:bg-green-700'} text-white`}>{inject.status==='completed'?'↺':'✓'}</button>
-                    <button title="Skip" aria-label={`Skip inject #${inject.number}`} onClick={() => onSkipInject(inject.id)} className="p-1 rounded bg-orange-600 hover:bg-orange-700 text-white">⤼</button>
-                    <button title="Delete" aria-label={`Delete inject #${inject.number}`} onClick={() => onDeleteInject(inject.id)} className="p-1 rounded bg-red-600 hover:bg-red-700 text-white">🗑</button>
-                  </div>
-                </div>
-                <div className="mt-2 text-white text-sm whitespace-pre-wrap break-words">
-                  <EditableField
-                    inject={inject}
-                    field="title"
-                    value={inject.title}
-                    displayValue={inject.title}
-                    editingState={localEditingState}
-                    onStartEdit={handleStartEdit}
-                    onSaveEdit={handleSaveEdit}
-                    onCancelEdit={handleCancelEdit}
-                    onEditingValueChange={setLocalEditingValue}
-                    onKeyPress={handleKeyPress}
-                    className="whitespace-pre-wrap break-words"
-                  />
-                </div>
-                {(inject.notes || inject.resources) && (
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300">
-                    <div className="whitespace-pre-wrap break-words">
-                      <span className="text-gray-400">Notes:</span>{' '}
-                      <EditableField
-                        inject={inject}
-                        field="notes"
-                        value={inject.notes || ''}
-                        displayValue={inject.notes || '-'}
-                        editingState={localEditingState}
-                        onStartEdit={handleStartEdit}
-                        onSaveEdit={handleSaveEdit}
-                        onCancelEdit={handleCancelEdit}
-                        onEditingValueChange={setLocalEditingValue}
-                        onKeyPress={handleKeyPress}
-                      />
-                    </div>
-                    <div className="truncate">
-                      <span className="text-gray-400">Resources:</span>{' '}
-                      <EditableField
-                        inject={inject}
-                        field="resources"
-                        value={inject.resources || ''}
-                        displayValue={inject.resources || '-'}
-                        editingState={localEditingState}
-                        onStartEdit={handleStartEdit}
-                        onSaveEdit={handleSaveEdit}
-                        onCancelEdit={handleCancelEdit}
-                        onEditingValueChange={setLocalEditingValue}
-                        onKeyPress={handleKeyPress}
-                        className="truncate"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
         </div>
       )}
     </div>

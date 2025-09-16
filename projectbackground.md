@@ -13,9 +13,10 @@ To provide emergency management professionals with a powerful, intuitive digital
 - **Exercise Control**: Centralized command and control for exercise coordinators
 - **Real-time Monitoring**: Live tracking of exercise progression and participant responses
 - **Resource Management**: Dynamic allocation and tracking of emergency resources
-- **Documentation**: Comprehensive exercise recording for post-exercise analysis
-- **Standards Compliance**: Adherence to established emergency management frameworks
-= **Exercise administration**: Loading and saving of existing exercises, allowing the editing and saving of exercises.
+ - **Documentation**: Comprehensive exercise recording for post-exercise analysis
+ - **Standards Compliance**: Adherence to established emergency management frameworks
+ - **Exercise Administration**: Load and save exercises for reuse; edit and re-export exercises
+ - **Reporting & Admin Panel**: Dedicated Dashboard Admin section for Export/Import Exercise JSON, Export Logs, PDF report generation, and Reset
 
 ## Target Users
 

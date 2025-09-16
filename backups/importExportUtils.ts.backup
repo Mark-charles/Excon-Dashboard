@@ -4,27 +4,18 @@ import { parseHMS } from './timeUtils'
 import { generateId, normalizeHeader, mapInjectType, validateMSEData } from './validation'
 
 // Lazy-load Mammoth browser build at runtime to avoid bundler resolution issues
-const LOCAL_MAMMOTH = '/vendor/mammoth.browser.min.js'
-const CDN_MAMMOTH = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js'
-
-const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
-  const script = document.createElement('script')
-  script.src = src
-  script.async = true
-  script.onload = () => resolve()
-  script.onerror = () => reject(new Error(`Failed to load script: ${src}`))
-  document.head.appendChild(script)
-})
-
 const loadMammoth = async (): Promise<any> => {
   if (typeof window === 'undefined') return null
   const w = window as unknown as { mammoth?: any }
   if (w.mammoth) return w.mammoth
-  try {
-    await loadScript(LOCAL_MAMMOTH)
-  } catch {
-    await loadScript(CDN_MAMMOTH)
-  }
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js'
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load DOCX parser'))
+    document.head.appendChild(script)
+  })
   return (window as any).mammoth
 }
 

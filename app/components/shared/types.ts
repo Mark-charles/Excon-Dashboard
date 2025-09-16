@@ -12,6 +12,8 @@ export interface InjectItem {
   status: InjectStatus
   to: string
   from: string
+  notes?: string
+  resources?: string
 }
 
 export interface ResourceItem {

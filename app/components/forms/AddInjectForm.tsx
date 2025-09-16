@@ -4,7 +4,15 @@ import React, { useState, useCallback } from 'react'
 import type { InjectType } from '../shared/types'
 
 interface AddInjectFormProps {
-  onAddInject: (title: string, dueTime: string, type: InjectType, to: string, from: string) => void
+  onAddInject: (
+    title: string,
+    dueTime: string,
+    type: InjectType,
+    to: string,
+    from: string,
+    notes: string,
+    resources: string,
+  ) => void
   onImportClick: () => void
 }
 
@@ -14,24 +22,28 @@ const AddInjectForm = React.memo<AddInjectFormProps>(({ onAddInject, onImportCli
   const [type, setType] = useState<InjectType>('in person')
   const [to, setTo] = useState('')
   const [from, setFrom] = useState('')
+  const [notes, setNotes] = useState('')
+  const [resources, setResources] = useState('')
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     if (title.trim() && dueTime && to.trim() && from.trim()) {
-      onAddInject(title, dueTime, type, to, from)
+      onAddInject(title, dueTime, type, to, from, notes, resources)
       setTitle('')
       setDueTime('')
       setType('in person')
       setTo('')
       setFrom('')
+      setNotes('')
+      setResources('')
     }
   }, [title, dueTime, type, to, from, onAddInject])
 
   return (
     <div className="bg-gray-800 rounded-lg p-6">
       <div className="mb-4">
-        <h3 className="text-2xl font-bold text-white">Add Injects</h3>
-        <p className="text-sm text-gray-400">Add single inject or import multiple</p>
+        <h3 className="text-2xl font-bold text-white">Add to Master Schedule of Events</h3>
+        <p className="text-sm text-gray-400">Add a single MSE item or import multiple</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -63,26 +75,39 @@ const AddInjectForm = React.memo<AddInjectFormProps>(({ onAddInject, onImportCli
         </select>
         <input
           type="text"
-          placeholder="To"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
+          placeholder="Inject From"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 text-white rounded"
           required
         />
         <input
           type="text"
-          placeholder="From"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
+          placeholder="Inject To"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 text-white rounded"
           required
+        />
+        <textarea
+          placeholder="Additional Notes/Actions"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded min-h-[80px]"
+        />
+        <input
+          type="text"
+          placeholder="Resources (filename or reference)"
+          value={resources}
+          onChange={(e) => setResources(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded"
         />
         <div className="flex gap-2">
           <button
             type="submit"
             className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold"
           >
-            Add Inject
+            Add MSE Item
           </button>
           <button
             type="button"
