@@ -20,6 +20,21 @@ import ImportInjectsModal from '../components/modals/ImportInjectsModal'
 import ImportResourcesModal from '../components/modals/ImportResourcesModal'
 
 const initialInjects: InjectItem[] = []
+const injectFieldKeys = ['number', 'title', 'dueSeconds', 'type', 'to', 'from', 'notes', 'resources'] as const
+type InjectFieldKey = (typeof injectFieldKeys)[number]
+type InjectFieldChange = {
+  from: InjectItem[InjectFieldKey]
+  to: InjectItem[InjectFieldKey]
+}
+
+type ActivityKind =
+  | 'inject:add' | 'inject:update' | 'inject:status' | 'inject:move' | 'inject:skip' | 'inject:delete'
+  | 'resource:add' | 'resource:status' | 'resource:eta'
+  | 'session:reset' | 'session:import' | 'session:export' | 'report:export'
+
+type ActivityDetails = Record<string, unknown>
+
+interface ActivityEntry { ts: number; kind: ActivityKind; details: ActivityDetails }
 
 export default function Dashboard() {
   // Exercise info
@@ -33,11 +48,6 @@ export default function Dashboard() {
   const [injects, setInjects] = useState<InjectItem[]>(initialInjects)
   const [resources, setResources] = useState<ResourceItem[]>([])
   // Activity log for audit/reporting
-  type ActivityKind =
-    | 'inject:add' | 'inject:update' | 'inject:status' | 'inject:move' | 'inject:skip' | 'inject:delete'
-    | 'resource:add' | 'resource:status' | 'resource:eta'
-    | 'session:reset' | 'session:import' | 'session:export' | 'report:export'
-  interface ActivityEntry { ts: number; kind: ActivityKind; details: any }
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   // Persistence / restore state
   const [pendingRestore, setPendingRestore] = useState<null | {
@@ -55,7 +65,7 @@ export default function Dashboard() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showResourceImportModal, setShowResourceImportModal] = useState(false)
 
-  const logActivity = useCallback((kind: ActivityKind, details: any) => {
+  const logActivity = useCallback((kind: ActivityKind, details: ActivityDetails = {}) => {
     const entry: ActivityEntry = { ts: Date.now(), kind, details }
     setActivity(prev => [...prev, entry])
   }, [])
@@ -270,11 +280,16 @@ export default function Dashboard() {
     try {
       const before = new Map(injects.map(i => [i.id, i]))
       updatedInjects.forEach(u => {
-        const b = before.get(u.id)
-        if (!b) return
-        const changes: Record<string, { from: any; to: any }> = {}
-        ;(['number','title','dueSeconds','type','to','from','notes','resources'] as const).forEach((k) => {
-          if ((b as any)[k] !== (u as any)[k]) changes[k] = { from: (b as any)[k], to: (u as any)[k] }
+        const previous = before.get(u.id)
+        if (!previous) return
+        const changes: Partial<Record<InjectFieldKey, InjectFieldChange>> = {}
+        injectFieldKeys.forEach((key) => {
+          if (previous[key] !== u[key]) {
+            changes[key] = {
+              from: previous[key],
+              to: u[key],
+            }
+          }
         })
         if (Object.keys(changes).length) logActivity('inject:update', { id: u.id, changes })
       })

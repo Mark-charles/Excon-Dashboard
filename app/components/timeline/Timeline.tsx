@@ -235,11 +235,11 @@ const Timeline: React.FC<TimelineProps> = ({
                         <div><span className="text-yellow-400">To:</span> {inject.to || 'All units'}</div>
                         <div><span className="text-yellow-400">From:</span> {inject.from || 'Exercise Control'}</div>
                         <div><span className="text-yellow-400">Status:</span> <span className="capitalize">{inject.status}</span></div>
-                        {('notes' in inject) && (inject as any).notes ? (
-                          <div><span className="text-yellow-400">Notes:</span> {(inject as any).notes}</div>
+                        {inject.notes ? (
+                          <div><span className="text-yellow-400">Notes:</span> {inject.notes}</div>
                         ) : null}
-                        {('resources' in inject) && (inject as any).resources ? (
-                          <div><span className="text-yellow-400">Resources:</span> {(inject as any).resources}</div>
+                        {inject.resources ? (
+                          <div><span className="text-yellow-400">Resources:</span> {inject.resources}</div>
                         ) : null}
                       </div>
                       {/* Tooltip arrow */}

@@ -37,7 +37,7 @@ const AddInjectForm = React.memo<AddInjectFormProps>(({ onAddInject, onImportCli
       setNotes('')
       setResources('')
     }
-  }, [title, dueTime, type, to, from, onAddInject])
+  }, [title, dueTime, type, to, from, notes, resources, onAddInject])
 
   return (
     <div className="bg-gray-800 rounded-lg p-6">
