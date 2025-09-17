@@ -3,19 +3,21 @@
 import React, { useState } from 'react'
 import type { ResourceItem, ResourceStatus } from '../shared/types'
 import { formatHMS } from '../../utils/timeUtils'
-import { getResourceTypeGlyph } from '../../utils/iconHelpers'
 import { isTerminalStatus } from '../../utils/validation'
+import { getResourceInitials } from '../../utils/resourceUtils'
 
 interface ResourceRequestBoardProps {
   resources: ResourceItem[]
   onResourceStatusChange: (resourceId: string, newStatus: ResourceStatus) => void
   onResourceETAEdit: (resourceId: string, newETATime: string) => boolean
+  onPopout?: () => void
 }
 
 const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
   resources,
   onResourceStatusChange,
-  onResourceETAEdit
+  onResourceETAEdit,
+  onPopout
 }) => {
   const [editingResource, setEditingResource] = useState<string | null>(null)
   const [editETA, setEditETA] = useState('')
@@ -49,10 +51,26 @@ const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
           <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
           <h3 className="text-3xl font-bold text-white tracking-tight">Request Board</h3>
         </div>
-        <div className="bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-600/50">
-          <span className="text-gray-300 text-sm font-medium">
-            {resources.length} Resources | {resources.filter(r => r.status === 'arrived').length} On Scene
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-600/50">
+            <span className="text-gray-300 text-sm font-medium">
+              {resources.length} Resources | {resources.filter(r => r.status === 'arrived').length} On Scene
+            </span>
+          </div>
+          {onPopout && (
+            <button
+              type="button"
+              onClick={onPopout}
+              className="p-2 rounded-lg bg-gray-800/60 border border-gray-600/60 text-gray-200 hover:text-white hover:border-emerald-400/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-gray-900"
+              aria-label="Open resource board in a new window"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M7 7h10v10" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M17 7l-8 8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M7 17h10" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -104,7 +122,9 @@ const ResourceRequestBoard: React.FC<ResourceRequestBoardProps> = ({
                   >
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-3">
-                        <div className="text-lg">{getResourceTypeGlyph(resource, 'svg', 'small')}</div>
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-400/40 text-emerald-200 font-semibold flex items-center justify-center text-sm uppercase">
+                          {getResourceInitials(resource.label)}
+                        </div>
                         <div>
                           <div className="text-white font-medium">{resource.label}</div>
                           {resource.kind && (

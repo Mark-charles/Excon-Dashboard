@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import type { InjectItem, ResourceItem, FilterState } from '../shared/types'
 import { formatHMS, parseHMS } from '../../utils/timeUtils'
-import { getInjectTypeGlyph, getResourceTypeGlyph } from '../../utils/iconHelpers'
+import { getInjectTypeGlyph } from '../../utils/iconHelpers'
+import { getResourceInitials } from '../../utils/resourceUtils'
 
 interface TimelineProps {
   injects: InjectItem[]
@@ -149,19 +150,6 @@ const Timeline: React.FC<TimelineProps> = ({
             <span className="text-red-400">{getInjectTypeGlyph('map inject', 'svg', 'small')}</span>
             <span>Map</span>
           </div>
-          <div className="text-emerald-400 font-medium ml-4">Resources:</div>
-          <div className="flex items-center gap-1">
-            <span className="text-emerald-400">{getResourceTypeGlyph('ambulance', 'svg', 'small')}</span>
-            <span>Ambulance</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-red-500">{getResourceTypeGlyph('fire', 'svg', 'small')}</span>
-            <span>Fire</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-blue-500">{getResourceTypeGlyph('police', 'svg', 'small')}</span>
-            <span>Police</span>
-          </div>
         </div>
       </div>
       
@@ -201,7 +189,9 @@ const Timeline: React.FC<TimelineProps> = ({
             {filteredInjects.map((inject) => {
               const position = getTimelinePosition(inject.dueSeconds)
               const verticalOffset = getVerticalOffset(inject.dueSeconds, inject.id)
-              
+              const timeUntilDue = inject.dueSeconds - currentSeconds
+              const isDueSoon = inject.status === 'pending' && timeUntilDue >= 0 && timeUntilDue <= 60
+
               return (
                 <div
                   key={`inject-${inject.id}`}
@@ -213,12 +203,13 @@ const Timeline: React.FC<TimelineProps> = ({
                   }}
                 >
                   {/* Inject Icon */}
-                  <div 
+                  <div
                     className={`
                       transition-all duration-200 hover:scale-125 p-1 rounded-full drop-shadow
                       ${inject.status === 'completed' ? 'text-emerald-300 bg-emerald-400/20' :
                         inject.status === 'missed' ? 'text-red-300 bg-red-400/20 animate-pulse' :
-                        inject.status === 'skipped' ? 'text-orange-300 bg-orange-400/20' : 
+                        inject.status === 'skipped' ? 'text-orange-300 bg-orange-400/20' :
+                        isDueSoon ? 'text-orange-200 bg-orange-500/30 ring-2 ring-orange-400/70 animate-pulse' :
                         'text-blue-300 bg-blue-400/20'}
                     `}
                   >
@@ -276,9 +267,13 @@ const Timeline: React.FC<TimelineProps> = ({
                         'text-gray-300 bg-gray-400/20'}
                     `}
                   >
-                    {getResourceTypeGlyph(resource, 'svg', 'small')}
+                    <div
+                      className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-400/40 text-emerald-200 font-semibold flex items-center justify-center text-xs uppercase"
+                    >
+                      {getResourceInitials(resource.label)}
+                    </div>
                   </div>
-                  
+
                   {/* Hover Tooltip */}
                   <div className="absolute top-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                     <div className="bg-gray-900 text-white p-3 rounded-lg shadow-xl border border-gray-700 text-sm max-w-xs">
