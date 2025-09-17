@@ -209,28 +209,32 @@ const InjectList: React.FC<InjectListProps> = React.memo(({
   const renderStatusIcon = (status: InjectItem['status']) => {
     if (status === 'completed') {
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" className="text-emerald-400" aria-label="Completed" title="Completed">
+        <svg width="16" height="16" viewBox="0 0 24 24" className="text-emerald-400" aria-label="Completed">
+          <title>Completed</title>
           <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" fill="none"/>
         </svg>
       )
     }
     if (status === 'missed') {
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" className="text-red-400" aria-label="Missed" title="Missed">
+        <svg width="16" height="16" viewBox="0 0 24 24" className="text-red-400" aria-label="Missed">
+          <title>Missed</title>
           <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2"/>
         </svg>
       )
     }
     if (status === 'skipped') {
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" className="text-orange-400" aria-label="Skipped" title="Skipped">
+        <svg width="16" height="16" viewBox="0 0 24 24" className="text-orange-400" aria-label="Skipped">
+          <title>Skipped</title>
           <path d="M5 12h14" stroke="currentColor" strokeWidth="2"/>
         </svg>
       )
     }
 
     return (
-      <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400" aria-label="Pending" title="Pending">
+      <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-400" aria-label="Pending">
+        <title>Pending</title>
         <circle cx="5" cy="5" r="4" fill="currentColor"/>
       </svg>
     )
