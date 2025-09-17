@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Overlay ASCII labels for icon-only buttons */
+.icon-btn{ position:relative; color:transparent !important; }
+.icon-btn::after{ content: attr(data-label); color:#fff; position:absolute; left:50%; top:50%; transform: translate(-50%, -50%); }
+
+
+/* Icon sizing wrapper */
+.icon-wrap{ display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:9999px; }
+

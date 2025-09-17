@@ -1,0 +1,639 @@
+'use client'
+
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import type { InjectItem, InjectType, EditingState } from '../shared/types'
+import { formatHMS, parseHMS, isCurrentInject } from '../../utils/timeUtils'
+import { getInjectTypeGlyph } from '../../utils/iconHelpers'
+
+interface InjectListProps {
+  injects: InjectItem[]
+  currentSeconds: number
+  onUpdateInjects: (updatedInjects: InjectItem[]) => void
+  onToggleInjectStatus: (injectId: string) => void
+  onMoveInject: (id: string, direction: 'up' | 'down') => void
+  onSkipInject: (id: string) => void
+  onDeleteInject: (id: string) => void
+}
+
+interface EditableFieldProps {
+  inject: InjectItem
+  field: string
+  value: string | number
+  displayValue?: string
+  isSelect?: boolean
+  selectOptions?: string[]
+  editingState: EditingState
+  onStartEdit: (id: string, field: string, currentValue: string | number) => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onEditingValueChange: (value: string) => void
+  onKeyPress: (e: React.KeyboardEvent) => void
+  className?: string
+}
+
+const EditableField: React.FC<EditableFieldProps> = ({ 
+  inject, 
+  field, 
+  value, 
+  displayValue, 
+  isSelect = false, 
+  selectOptions = [],
+  editingState,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditingValueChange,
+  onKeyPress,
+  className
+}) => {
+  const isEditing = editingState.editingField?.id === inject.id && editingState.editingField?.field === field
+  
+  if (isEditing) {
+    if (isSelect) {
+      return (
+        <select
+          value={editingState.editingValue}
+          onChange={(e) => onEditingValueChange(e.target.value)}
+          onBlur={onSaveEdit}
+          onKeyDown={onKeyPress}
+          className="px-2 py-1 bg-gray-700 text-white text-xs rounded border border-blue-400 focus:ring-1 focus:ring-blue-400"
+          autoFocus
+        >
+          {selectOptions.map(option => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      )
+    }
+
+    // Multiline editing for Inject title and Notes
+    if (field === 'title' || field === 'notes') {
+      const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          onSaveEdit()
+        } else if (e.key === 'Escape') {
+          onCancelEdit()
+        }
+      }
+      return (
+        <textarea
+          value={editingState.editingValue}
+          onChange={(e) => onEditingValueChange(e.target.value)}
+          onBlur={onSaveEdit}
+          onKeyDown={handleKeyDown}
+          rows={4}
+          className="px-3 py-2 bg-gray-700 text-white text-sm rounded-md border border-blue-400 focus:ring-2 focus:ring-blue-400 focus:border-blue-300 min-w-0 w-full whitespace-pre-wrap break-words resize-none"
+          autoFocus
+        />
+      )
+    }
+
+    return (
+      <input
+        type="text"
+        value={editingState.editingValue}
+        onChange={(e) => onEditingValueChange(e.target.value)}
+        onBlur={onSaveEdit}
+        onKeyDown={onKeyPress}
+        className="px-3 py-2 bg-gray-700 text-white text-sm rounded-md border border-blue-400 focus:ring-2 focus:ring-blue-400 focus:border-blue-300 min-w-0 w-full"
+        autoFocus
+      />
+    )
+  }
+
+  const baseBtn = "cursor-pointer hover:bg-gray-700/50 px-1 py-1 rounded transition-colors text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 focus-visible:ring-offset-gray-900";
+  const btnClass = className ? `${baseBtn} ${className}` : `${baseBtn} truncate`;
+  return (
+    <button
+      type="button"
+      onClick={() => onStartEdit(inject.id, field, value)}
+      className={btnClass}
+      title="Click to edit"
+      aria-label={`Edit ${field} for inject #${inject.number}`}
+    >
+      {displayValue || value}
+    </button>
+  )
+}
+
+// Virtual scrolling constants
+const ROW_HEIGHT = 80 // Approximate height of each row in pixels
+const BUFFER_SIZE = 5 // Number of extra rows to render above and below visible area
+
+// Performance optimization: Only update virtual scrolling if scroll distance is significant
+const SCROLL_DEBOUNCE_THRESHOLD = 10 // pixels
+
+const InjectList: React.FC<InjectListProps> = React.memo(({
+  injects,
+  currentSeconds,
+  onUpdateInjects,
+  onToggleInjectStatus,
+  onMoveInject,
+  onSkipInject,
+  onDeleteInject
+}) => {
+  const [localEditingField, setLocalEditingField] = useState<{id: string, field: string} | null>(null)
+  const [localEditingValue, setLocalEditingValue] = useState<string>('')
+
+  // Virtual scrolling state
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [containerHeight, setContainerHeight] = useState(700)
+
+  const handleStartEdit = (id: string, field: string, currentValue: string | number) => {
+    setLocalEditingField({ id, field })
+    setLocalEditingValue(String(currentValue))
+  }
+
+  const handleCancelEdit = () => {
+    setLocalEditingField(null)
+    setLocalEditingValue('')
+  }
+
+  const handleSaveEdit = () => {
+    if (!localEditingField) return
+
+    const { id, field } = localEditingField
+    const value = localEditingValue.trim()
+
+    const updated = injects.map(inject => {
+      if (inject.id !== id) return inject
+
+      switch (field) {
+        case 'number': {
+          const newNumber = parseInt(value)
+          if (isNaN(newNumber) || newNumber < 1) return inject
+          return { ...inject, number: newNumber }
+        }
+        case 'dueTime': {
+          const dueSeconds = parseHMS(value)
+          if (dueSeconds === null) return inject
+          return { ...inject, dueSeconds }
+        }
+        case 'title':
+          if (!value) return inject
+          return { ...inject, title: value }
+        case 'type':
+          if (!['in person', 'radio/phone', 'electronic', 'map inject', 'other'].includes(value)) return inject
+          return { ...inject, type: value as InjectType }
+        case 'to':
+          return { ...inject, to: value }
+        case 'from':
+          return { ...inject, from: value }
+        case 'notes':
+          return { ...inject, notes: value }
+        case 'resources':
+          return { ...inject, resources: value }
+        default:
+          return inject
+      }
+    })
+
+    onUpdateInjects(updated)
+    setLocalEditingField(null)
+    setLocalEditingValue('')
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit()
+    } else if (e.key === 'Escape') {
+      handleCancelEdit()
+    }
+  }
+
+  const localEditingState = {
+    editingField: localEditingField,
+    editingValue: localEditingValue
+  }
+
+  // Sort injects once for efficiency
+  const sortedInjects = useMemo(() =>
+    [...injects].sort((a, b) => a.dueSeconds - b.dueSeconds),
+    [injects]
+  )
+
+  // Virtual scrolling calculations
+  const visibleItems = useMemo(() => {
+    if (sortedInjects.length <= 20) {
+      // For small lists, render all items
+      return { items: sortedInjects, startIndex: 0, endIndex: sortedInjects.length - 1 }
+    }
+
+    const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_SIZE)
+    const visibleCount = Math.ceil(containerHeight / ROW_HEIGHT)
+    const endIndex = Math.min(sortedInjects.length - 1, startIndex + visibleCount + BUFFER_SIZE * 2)
+
+    return {
+      items: sortedInjects.slice(startIndex, endIndex + 1),
+      startIndex,
+      endIndex
+    }
+  }, [sortedInjects, scrollTop, containerHeight])
+
+  // Handle scroll events with debouncing for performance
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const newScrollTop = e.currentTarget.scrollTop
+    // Only update if scroll change is significant to reduce re-renders
+    if (Math.abs(newScrollTop - scrollTop) > SCROLL_DEBOUNCE_THRESHOLD) {
+      setScrollTop(newScrollTop)
+    }
+  }, [scrollTop])
+
+  // Update container height on resize
+  useEffect(() => {
+    const updateHeight = () => {
+      if (scrollContainerRef.current) {
+        setContainerHeight(scrollContainerRef.current.clientHeight)
+      }
+    }
+
+    updateHeight()
+    window.addEventListener('resize', updateHeight)
+    return () => window.removeEventListener('resize', updateHeight)
+  }, [])
+
+  return (
+    <div className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 rounded-2xl p-6 shadow-2xl border border-gray-600/50 backdrop-blur-sm">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse shadow-blue-500/50 shadow-lg"></div>
+            <div className="absolute inset-0 w-4 h-4 bg-blue-400 rounded-full animate-ping opacity-20"></div>
+          </div>
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent tracking-tight">
+            Master Schedule of Events
+          </h3>
+        </div>
+        <div className="bg-gradient-to-r from-blue-900/30 to-slate-800/50 px-5 py-3 rounded-xl border border-blue-500/30 backdrop-blur-sm">
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+              <span className="text-blue-300 font-medium">{injects.length} Total</span>
+            </div>
+            <div className="w-px h-4 bg-gray-600"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              <span className="text-green-300 font-medium">{injects.filter(i => i.status === 'completed').length} Complete</span>
+            </div>
+            <div className="w-px h-4 bg-gray-600"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+              <span className="text-red-300 font-medium">{injects.filter(i => i.status === 'missed').length} Missed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {injects.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="mb-4 inline-flex items-center justify-center text-blue-400">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="4" y="5" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M8 16h8" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M12 16v3" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </div>
+          <div className="text-xl font-medium text-gray-300 mb-2">No Schedule Items</div>
+          <div className="text-gray-400">Items will appear here when added to the Master Schedule of Events</div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <div
+            ref={scrollContainerRef}
+            className="max-h-[700px] overflow-y-auto border border-gray-600 rounded-lg shadow-2xl"
+            onScroll={handleScroll}
+            role="table"
+            aria-label="Master Schedule of Events"
+            aria-rowcount={sortedInjects.length + 1}
+            tabIndex={0}
+          >
+            {/* MSE Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 border-b-2 border-blue-500/70 z-10 shadow-lg backdrop-blur-sm" role="rowgroup">
+              <div
+                className="grid grid-cols-10 gap-2 lg:gap-4 px-3 lg:px-4 py-4 text-sm font-bold text-white tracking-wide"
+                style={{
+                  gridTemplateColumns: '70px 90px 1fr 110px 110px 120px 180px 110px 90px 130px'
+                }}
+                role="row"
+                aria-rowindex={1}
+              >
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>Number</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="ascending">Elapsed<br/>Time</div>
+                <div className="text-left pl-2 text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>From</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>To</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Inject<br/>Type</div>
+                <div className="text-left pl-2 text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Additional Notes/Actions</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Resources</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Completed</div>
+                <div className="text-center text-blue-100 uppercase tracking-wider text-xs" role="columnheader" aria-sort="none">Actions</div>
+              </div>
+            </div>
+            {/* MSE Body */}
+            <div
+              className="bg-gradient-to-b from-gray-900 to-slate-900 relative"
+              style={{ height: sortedInjects.length * ROW_HEIGHT }}
+              role="rowgroup"
+            >
+              {/* Spacer for virtual scrolling offset */}
+              <div style={{ height: visibleItems.startIndex * ROW_HEIGHT }} />
+
+              {visibleItems.items.map((inject, index) => {
+                const sortedIndex = visibleItems.startIndex + index
+                return (
+                <div
+                  key={inject.id}
+                  className={`
+                    grid grid-cols-10 gap-2 lg:gap-4 px-3 lg:px-4 py-5 border-b border-gray-700/40 hover:bg-blue-900/10 hover:border-blue-600/30 transition-all duration-200
+                    ${isCurrentInject(currentSeconds, inject.dueSeconds) ? 'bg-yellow-900/20 border-yellow-400/50 shadow-yellow-400/20 shadow-sm' : ''}
+                    ${inject.status === 'skipped' ? 'opacity-60' : ''}
+                    ${sortedIndex % 2 === 0 ? 'bg-slate-900/50' : 'bg-gray-900/30'}
+                  `}
+                  style={{
+                    gridTemplateColumns: '70px 90px 1fr 110px 110px 120px 180px 110px 90px 130px'
+                  }}
+                  role="row"
+                  aria-rowindex={sortedIndex + 2}
+                  aria-label={`Inject ${inject.number}: ${inject.title} at ${formatHMS(inject.dueSeconds)}, status: ${inject.status}`}
+                  tabIndex={0}
+                >
+                  {/* Inject Number */}
+                  <div className="flex justify-center items-center text-center" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="number"
+                      value={inject.number}
+                      displayValue={`#${inject.number}`}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="text-blue-400 font-bold text-sm whitespace-nowrap"
+                    />
+                  </div>
+                    
+                  {/* Elapsed Time */}
+                  <div className="flex justify-center items-center text-center" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="dueTime"
+                      value={formatHMS(inject.dueSeconds)}
+                      displayValue={formatHMS(inject.dueSeconds)}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="font-mono text-green-400 font-medium text-sm whitespace-nowrap"
+                    />
+                  </div>
+                    
+                  {/* Inject Title */}
+                  <div className="flex items-start justify-start pl-2" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="title"
+                      value={inject.title}
+                      displayValue={inject.title}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="text-white text-sm leading-relaxed whitespace-pre-wrap break-words w-full"
+                    />
+                  </div>
+                    
+                  {/* Inject From */}
+                  <div className="flex justify-center items-center text-center" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="from"
+                      value={inject.from || ''}
+                      displayValue={inject.from || 'ExCon'}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="text-gray-300 text-sm truncate w-full text-center"
+                    />
+                  </div>
+
+                  {/* Inject To */}
+                  <div className="flex justify-center items-center text-center" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="to"
+                      value={inject.to || ''}
+                      displayValue={inject.to || 'All Units'}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="text-gray-300 text-sm truncate w-full text-center"
+                    />
+                  </div>
+
+                  {/* Inject Type */}
+                  <div className="flex justify-center items-center" role="gridcell">
+                    {localEditingField?.id === inject.id && localEditingField?.field === 'type' ? (
+                      <select
+                        value={localEditingValue}
+                        onChange={(e) => setLocalEditingValue(e.target.value)}
+                        onBlur={handleSaveEdit}
+                        onKeyDown={handleKeyPress}
+                        className="px-2 py-1 bg-gray-700 text-white text-sm rounded border border-blue-400 focus:ring-1 focus:ring-blue-400 w-full"
+                        autoFocus
+                      >
+                        <option value="in person">Face to Face</option>
+                        <option value="radio/phone">Radio/Phone</option>
+                        <option value="electronic">Electronic</option>
+                        <option value="map inject">Map Inject</option>
+                        <option value="other">Other</option>
+                      </select>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(inject.id, 'type', inject.type)}
+                        className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-700/50 hover:bg-gray-600/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 w-full justify-center"
+                        title="Click to edit inject type"
+                        aria-label={`Edit type for inject #${inject.number}`}
+                      >
+                        <span className="text-sm">{getInjectTypeGlyph(inject.type, 'svg', 'small')}</span>
+                        <span className="capitalize text-sm font-medium text-gray-200">
+                          {inject.type === 'in person' ? 'Face to Face' :
+                           inject.type === 'radio/phone' ? 'Radio/Phone' :
+                           inject.type === 'map inject' ? 'Map Inject' :
+                           inject.type.charAt(0).toUpperCase() + inject.type.slice(1)}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Additional Notes/Actions */}
+                  <div className="flex items-start justify-start pl-2" role="gridcell">
+                    <EditableField
+                      inject={inject}
+                      field="notes"
+                      value={inject.notes || ''}
+                      displayValue={inject.notes || ''}
+                      editingState={localEditingState}
+                      onStartEdit={handleStartEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onCancelEdit={handleCancelEdit}
+                      onEditingValueChange={setLocalEditingValue}
+                      onKeyPress={handleKeyPress}
+                      className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap break-words w-full"
+                    />
+                  </div>
+
+                  {/* Resources */}
+                  <div className="flex justify-center items-center text-center" role="gridcell">
+                    <div className="flex items-center gap-2 justify-center w-full">
+                      {inject.resources ? (
+                        <>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-emerald-400 flex-shrink-0">
+                            <path d="M8 17l7-7a2.5 2.5 0 10-3.5-3.5L5 9a4 4 0 106 6l6-6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                          </svg>
+                          <EditableField
+                            inject={inject}
+                            field="resources"
+                            value={inject.resources}
+                            displayValue={inject.resources}
+                            editingState={localEditingState}
+                            onStartEdit={handleStartEdit}
+                            onSaveEdit={handleSaveEdit}
+                            onCancelEdit={handleCancelEdit}
+                            onEditingValueChange={setLocalEditingValue}
+                            onKeyPress={handleKeyPress}
+                            className="text-emerald-400 text-sm font-medium truncate"
+                          />
+                        </>
+                      ) : (
+                        <EditableField
+                          inject={inject}
+                          field="resources"
+                          value={inject.resources || ''}
+                          displayValue={inject.resources || ''}
+                          editingState={localEditingState}
+                          onStartEdit={handleStartEdit}
+                          onSaveEdit={handleSaveEdit}
+                          onCancelEdit={handleCancelEdit}
+                          onEditingValueChange={setLocalEditingValue}
+                          onKeyPress={handleKeyPress}
+                          className="text-gray-400 text-sm truncate w-full text-center"
+                        />
+                      )}
+                    </div>
+                  </div>
+                    
+                  {/* Completed Status */}
+                  <div className="flex justify-center items-center" role="gridcell">
+                    <div className="flex items-center justify-center gap-2 px-3 py-2 rounded-full bg-gray-700/30">
+                      <div className={`w-3 h-3 rounded-full ${
+                        inject.status === 'completed' ? 'bg-green-500 shadow-green-500/50 shadow-sm' :
+                        inject.status === 'missed' ? 'bg-red-500 animate-pulse shadow-red-500/50 shadow-sm' :
+                        inject.status === 'skipped' ? 'bg-orange-500 shadow-orange-500/50 shadow-sm' : 'bg-gray-400'
+                      }`}></div>
+                      <span className={`text-sm font-medium ${
+                        inject.status === 'completed' ? 'text-green-400' :
+                        inject.status === 'missed' ? 'text-red-400' :
+                        inject.status === 'skipped' ? 'text-orange-400' : 'text-gray-400'
+                      }`}>
+                        {inject.status === 'completed' ? 'Yes' :
+                         inject.status === 'missed' ? 'Missed' :
+                         inject.status === 'skipped' ? 'Skipped' : 'No'}
+                      </span>
+                    </div>
+                  </div>
+                    
+                  {/* Actions */}
+                  <div className="flex justify-center items-center" role="gridcell">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onMoveInject(inject.id, 'up')}
+                        disabled={sortedIndex === 0}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        title="Move up"
+                        aria-label={`Move inject #${inject.number} up`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M12 5l7 7H5l7-7z" fill="currentColor"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveInject(inject.id, 'down')}
+                        disabled={sortedIndex === injects.length - 1}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        title="Move down"
+                        aria-label={`Move inject #${inject.number} down`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M12 19l-7-7h14l-7 7z" fill="currentColor"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onToggleInjectStatus(inject.id)}
+                        disabled={inject.status === 'skipped'}
+                        className={`p-2 rounded-md transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                          inject.status === 'completed'
+                            ? 'bg-gray-600 hover:bg-gray-700 text-white'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                        title={inject.status === 'completed' ? 'Mark incomplete' : 'Mark complete'}
+                        aria-label={inject.status === 'completed' ? `Mark inject #${inject.number} incomplete` : `Mark inject #${inject.number} complete`}
+                      >
+                        {inject.status === 'completed' ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2"/></svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2"/></svg>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSkipInject(inject.id)}
+                        disabled={inject.status === 'skipped' || inject.status === 'completed'}
+                        className="p-2 rounded-md bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                        title="Skip"
+                        aria-label={`Skip inject #${inject.number}`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2"/></svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteInject(inject.id)}
+                        className="p-2 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                        title="Delete"
+                        aria-label={`Delete inject #${inject.number}`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 7h12M9 7v12m6-12v12M10 5h4l1 2H9l1-2z" stroke="currentColor" strokeWidth="2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+})
+
+InjectList.displayName = 'InjectList'
+
+export default InjectList

@@ -1,0 +1,74 @@
+'use client'
+
+import React, { useCallback } from 'react'
+
+interface ExerciseHeaderProps {
+  exerciseName: string
+  controllerName: string
+  exerciseFinishTime: string
+  onExerciseNameChange: (value: string) => void
+  onControllerNameChange: (value: string) => void
+  onFinishTimeChange: (value: string) => void
+}
+
+const ExerciseHeader = React.memo<ExerciseHeaderProps>(({ 
+  exerciseName, 
+  controllerName, 
+  exerciseFinishTime, 
+  onExerciseNameChange, 
+  onControllerNameChange, 
+  onFinishTimeChange 
+}) => {
+  const handleExerciseNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onExerciseNameChange(e.target.value)
+  }, [onExerciseNameChange])
+  
+  const handleControllerNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onControllerNameChange(e.target.value)
+  }, [onControllerNameChange])
+  
+  const handleFinishTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onFinishTimeChange(e.target.value)
+  }, [onFinishTimeChange])
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col">
+          <label className="text-sm font-semibold text-gray-300 mb-1">Exercise Name</label>
+          <input
+            type="text"
+            value={exerciseName}
+            onChange={handleExerciseNameChange}
+            className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            placeholder="Enter exercise name"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-sm font-semibold text-gray-300 mb-1">Controller Name</label>
+          <input
+            type="text"
+            value={controllerName}
+            onChange={handleControllerNameChange}
+            className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            placeholder="Enter controller name"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-sm font-semibold text-gray-300 mb-1">Exercise Finish Time</label>
+          <input
+            type="text"
+            value={exerciseFinishTime}
+            onChange={handleFinishTimeChange}
+            className="px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+            placeholder="HH:MM:SS"
+          />
+        </div>
+      </div>
+    </div>
+  )
+})
+
+ExerciseHeader.displayName = 'ExerciseHeader'
+
+export default ExerciseHeader

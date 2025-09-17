@@ -1,0 +1,533 @@
+import * as XLSX from 'xlsx'
+import type { InjectItem, ResourceItem } from '../components/shared/types'
+import { parseHMS } from './timeUtils'
+import { generateId, normalizeHeader, mapInjectType, validateMSEData } from './validation'
+
+// Lazy-load Mammoth browser build at runtime to avoid bundler resolution issues
+const LOCAL_MAMMOTH = '/vendor/mammoth.browser.min.js'
+const CDN_MAMMOTH = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js'
+
+const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
+  const script = document.createElement('script')
+  script.src = src
+  script.async = true
+  script.onload = () => resolve()
+  script.onerror = () => reject(new Error(`Failed to load script: ${src}`))
+  document.head.appendChild(script)
+})
+
+const loadMammoth = async (): Promise<any> => {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as { mammoth?: any }
+  if (w.mammoth) return w.mammoth
+  try {
+    await loadScript(LOCAL_MAMMOTH)
+  } catch {
+    await loadScript(CDN_MAMMOTH)
+  }
+  return (window as any).mammoth
+}
+
+// Fuzzy matching for column headers - handles variations in real MSE documents
+const COLUMN_PATTERNS = {
+  injectNumber: [
+    'inject number', 'injectnumber', 'inject #', 'inject no', 'item number',
+    'item #', 'serial', 'sequence', 'number', '#', 'no', 'id'
+  ],
+  title: [
+    'inject', 'title', 'description', 'event', 'scenario', 'inject content',
+    'inject description', 'brief', 'details', 'summary', 'inject title'
+  ],
+  dueTime: [
+    'time', 'elapsed time', 'due time', 'inject time', 'event time',
+    'schedule time', 'timing', 'when', 'h:mm:ss', 'hh:mm:ss', 'duration'
+  ],
+  type: [
+    'inject type', 'type', 'category', 'method', 'delivery method',
+    'communication type', 'channel', 'mode', 'inject method'
+  ],
+  to: [
+    'inject to', 'to', 'recipient', 'target', 'addressee', 'receiving agency',
+    'receiving unit', 'destination', 'delivered to', 'sent to'
+  ],
+  from: [
+    'inject from', 'from', 'sender', 'source', 'originator', 'sending agency',
+    'sending unit', 'origin', 'delivered from', 'sent from', 'controller'
+  ],
+  notes: [
+    'additional notes/actions', 'notes', 'actions', 'additional notes',
+    'additional actions', 'comments', 'remarks', 'instructions', 'guidance',
+    'follow up', 'follow-up', 'response required', 'notes/actions'
+  ],
+  resources: [
+    'resources', 'equipment', 'personnel', 'assets', 'attachments',
+    'required resources', 'resource requirements', 'materials', 'supplies'
+  ]
+}
+
+// Calculate similarity between two strings (simple Levenshtein-based approach)
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const a = normalize(str1)
+  const b = normalize(str2)
+
+  if (a === b) return 1.0
+  if (a.includes(b) || b.includes(a)) return 0.8
+
+  // Simple partial matching
+  const words1 = a.split(/\s+/)
+  const words2 = b.split(/\s+/)
+  let matches = 0
+
+  for (const word1 of words1) {
+    for (const word2 of words2) {
+      if (word1 === word2 || word1.includes(word2) || word2.includes(word1)) {
+        matches++
+        break
+      }
+    }
+  }
+
+  return matches / Math.max(words1.length, words2.length)
+}
+
+// Find best matching column using fuzzy matching
+const findBestColumnMatch = (header: string, patterns: string[]): number => {
+  let bestScore = 0
+
+  for (const pattern of patterns) {
+    const score = calculateSimilarity(header, pattern)
+    if (score > bestScore) {
+      bestScore = score
+    }
+  }
+
+  return bestScore
+}
+
+export const downloadInjectsTemplate = (): void => {
+  const templateData = [
+    [
+      'Inject Number',
+      'Elapsed Time',
+      'Inject',
+      'Inject From',
+      'Inject To',
+      'Inject Type',
+      'Additional Notes/Actions',
+      'Resources',
+      'Completed'
+    ],
+    [
+      '1',
+      '00:00:00',
+      'INITIAL BRIEF - INC NAME: Chinganning Road Bushfire; CONTROL: Chinganning Control; INC NO: 808627',
+      'Local FCO',
+      'Incoming DO',
+      'Face to Face',
+      'Establish command and control structure. Issue initial briefing to incoming personnel.',
+      'INITIAL MAP; COMMS PLAN; MAP; APPLIANCE LIST',
+      'No'
+    ],
+    [
+      '2',
+      '00:10:00',
+      'INITIAL MAP 001 - BFB units are working hard to get a hold of this but it\'s getting away.',
+      'Sector North',
+      'OO',
+      'Radio',
+      'Provide situation update to Operations Officer. Red flag conditions present.',
+      'EXCON MAP',
+      'No'
+    ],
+    [
+      '3',
+      '00:13:00',
+      'Fire conditions worsening - Its pushing hard into tree line and creek bed we can\'t get in there.',
+      'Sector North',
+      'OO',
+      'Radio',
+      'Urgent resource request for additional ground crews and aerial support.',
+      'UHF Radio Channel 15',
+      'No'
+    ],
+    [
+      '4',
+      '00:17:00',
+      'We are at the farmhouse at 352 Chinganning road there is multiple buildings here, the fire is spotting north of the property.',
+      'Sector South',
+      'OO',
+      'Radio',
+      'Structure protection required. There is only one track through the scrub north of the farmhouse.',
+      'RED FLAG message to all for a warning; EXCON MAP',
+      'No'
+    ],
+    [
+      '5',
+      '00:20:00',
+      'Request someone make contact and monitor (UHF15) For Air intel',
+      '6AR',
+      'OO',
+      'Radio',
+      'Note who is assigned to monitor air operations frequency.',
+      'UHF Radio Channel 15',
+      'No'
+    ]
+  ]
+  
+  const worksheet = XLSX.utils.aoa_to_sheet(templateData)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Injects Template')
+  XLSX.writeFile(workbook, 'injects_template.csv')
+}
+
+export const downloadResourcesTemplate = (): void => {
+  const templateData = [
+    ['Label', 'ETA (minutes)', 'Status'],
+    ['Fire Engine 1', '15', 'requested'],
+    ['Ambulance 2', '20', 'requested'],
+    ['Police Unit 3', '10', 'requested'],
+    ['Command Unit', '5', 'requested']
+  ]
+  
+  const worksheet = XLSX.utils.aoa_to_sheet(templateData)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Resources Template')
+  XLSX.writeFile(workbook, 'resources_template.csv')
+}
+
+export interface InjectImportResult {
+  validInjects: InjectItem[]
+  errors: string[]
+}
+
+// Accepts HH:MM:SS or HH:MM, and tolerates a leading + (from elapsed representations)
+const parseFlexibleHMS = (input: string): number | null => {
+  const s = String(input || '').trim().replace(/^\+/, '')
+  const full = s.match(/^(\d{1,2}):(\d{2}):(\d{2})$/)
+  if (full) return parseHMS(s)
+  const hm = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (hm) return parseHMS(`${hm[1]}:${hm[2]}:00`)
+  return null
+}
+
+const textContent = (el: Element | null | undefined): string => {
+  if (!el) return ''
+  return (el.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+const processInjectsDocx = async (file: File, existingInjects: InjectItem[]): Promise<InjectImportResult> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const mammothLib = await loadMammoth()
+    if (!mammothLib) return { validInjects: [], errors: ['DOCX parsing is only available in the browser.'] }
+    const converted = await mammothLib.convertToHtml({ arrayBuffer })
+    const html = String(converted.value || '')
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const tables = Array.from(doc.querySelectorAll('table'))
+    if (tables.length === 0) {
+      return { validInjects: [], errors: ['No tables found in DOCX. Ensure the MSE is in a table format.'] }
+    }
+
+    let target: HTMLTableElement | null = null
+    for (const t of tables as HTMLTableElement[]) {
+      const headerRow = t.querySelector('tr')
+      if (!headerRow) continue
+      const headers = Array.from(headerRow.children).map((c) => normalizeHeader(textContent(c as Element)))
+      const hasInject = headers.some(h => h.includes('inject'))
+      const hasTime = headers.some(h => h.includes('elapsedtime') || h === 'time' || h.includes('duetime'))
+      if (hasInject && hasTime) { target = t; break }
+    }
+    if (!target) target = tables[0] as HTMLTableElement
+
+    const rows = Array.from(target.querySelectorAll('tr'))
+    if (rows.length < 2) return { validInjects: [], errors: ['DOCX MSE table has no data rows.'] }
+
+    const headerCells = Array.from(rows[0].children)
+    const headersNorm = headerCells.map((c) => normalizeHeader(textContent(c as Element)))
+    const idxOf = (pred: (h: string) => boolean) => headersNorm.findIndex(pred)
+
+    const numberIdx = idxOf(h => h.includes('injectnumber') || h === 'number' || h === '#')
+    const titleIdx = idxOf(h => h === 'inject' || h.includes('title') || h.includes('description'))
+    const timeIdx = idxOf(h => h.includes('elapsedtime') || h === 'time' || h.includes('duetime'))
+    const fromIdx = idxOf(h => h.includes('injectfrom') || h === 'from' || h.includes('sender'))
+    const toIdx = idxOf(h => h.includes('injectto') || h === 'to' || h.includes('recipient'))
+    const typeIdx = idxOf(h => h.includes('injecttype') || h === 'type' || h.includes('category'))
+    const notesIdx = idxOf(h => h.includes('additionalnotesactions') || h.includes('notes') || h.includes('actions'))
+    const resourcesIdx = idxOf(h => h.includes('resources') || h.includes('attachments'))
+
+    if (titleIdx === -1 || timeIdx === -1) {
+      return { validInjects: [], errors: ['Required columns not found: Inject and Time/Elapsed Time.'] }
+    }
+
+    const validInjects: InjectItem[] = []
+    const errors: string[] = []
+
+    for (let i = 1; i < rows.length; i++) {
+      const cells = Array.from(rows[i].children) as HTMLElement[]
+      if (cells.length === 0) continue
+      const get = (idx: number) => (idx >= 0 && idx < cells.length ? textContent(cells[idx]) : '')
+
+      const numberStr = get(numberIdx)
+      const title = get(titleIdx)
+      const tStr = get(timeIdx)
+      const fromStr = get(fromIdx)
+      const toStr = get(toIdx)
+      const typeStr = get(typeIdx)
+      const notesStr = get(notesIdx)
+      const resourcesStr = get(resourcesIdx)
+
+      if (!title && !tStr) continue
+      if (!title) { errors.push(`Row ${i + 1}: Inject is required`); continue }
+      const secs = parseFlexibleHMS(tStr)
+      if (secs === null) { errors.push(`Row ${i + 1}: Invalid time "${tStr}". Use HH:MM or HH:MM:SS`); continue }
+      const num = parseInt(numberStr, 10)
+      const type = mapInjectType(typeStr || 'other')
+      validInjects.push({
+        id: generateId(),
+        number: isNaN(num) ? existingInjects.length + validInjects.length + 1 : num,
+        title,
+        dueSeconds: secs,
+        type,
+        status: 'pending',
+        to: toStr,
+        from: fromStr,
+        notes: notesStr,
+        resources: resourcesStr,
+      })
+    }
+
+    return { validInjects, errors }
+  } catch {
+    return { validInjects: [], errors: ['Failed to process DOCX file.'] }
+  }
+}
+
+export const processInjectsFile = async (file: File, existingInjects: InjectItem[]): Promise<InjectImportResult> => {
+  const name = file.name.toLowerCase()
+  if (name.endsWith('.docx')) {
+    return processInjectsDocx(file, existingInjects)
+  }
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer)
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+    
+    if (jsonData.length < 2) {
+      return {
+        validInjects: [],
+        errors: ['File must contain at least one header row and one data row']
+      }
+    }
+    
+    const headers = jsonData[0] as string[]
+    const dataRows = jsonData.slice(1)
+
+    // Find column indices using fuzzy matching for better MSE compatibility
+    const findColumnIndex = (patterns: string[], threshold = 0.6): number => {
+      let bestIndex = -1
+      let bestScore = threshold
+
+      headers.forEach((header, index) => {
+        const score = findBestColumnMatch(header, patterns)
+        if (score > bestScore) {
+          bestScore = score
+          bestIndex = index
+        }
+      })
+
+      return bestIndex
+    }
+
+    const numberIdx = findColumnIndex(COLUMN_PATTERNS.injectNumber, 0.5)
+    const titleIdx = findColumnIndex(COLUMN_PATTERNS.title)
+    const dueTimeIdx = findColumnIndex(COLUMN_PATTERNS.dueTime)
+    const typeIdx = findColumnIndex(COLUMN_PATTERNS.type, 0.5)
+    const toIdx = findColumnIndex(COLUMN_PATTERNS.to, 0.5)
+    const fromIdx = findColumnIndex(COLUMN_PATTERNS.from, 0.5)
+    const notesIdx = findColumnIndex(COLUMN_PATTERNS.notes, 0.5)
+    const resourcesIdx = findColumnIndex(COLUMN_PATTERNS.resources, 0.5)
+    
+    if (titleIdx === -1 || dueTimeIdx === -1) {
+      const missingColumns = []
+      if (titleIdx === -1) missingColumns.push('Inject/Title')
+      if (dueTimeIdx === -1) missingColumns.push('Time/Duration')
+
+      return {
+        validInjects: [],
+        errors: [
+          `Required columns not found: ${missingColumns.join(', ')}.`,
+          `Available columns: ${headers.join(', ')}`,
+          'Please ensure your MSE has columns for inject content and timing.'
+        ]
+      }
+    }
+    
+    // Process rows and validate
+    const errors: string[] = []
+    const validInjects = [] as InjectItem[]
+    
+    (dataRows as unknown[][]).forEach((row: unknown[], rowIndex) => {
+      const rowNum = rowIndex + 2 // +2 because we start from row 1 and skip header
+      
+      const numberStr = numberIdx >= 0 ? String(row[numberIdx] ?? '').trim() : ''
+      const title = String(row[titleIdx] || '').trim()
+      const dueTimeStr = String(row[dueTimeIdx] || '').trim()
+      const typeStr = String(row[typeIdx] || 'other').trim()
+      const toStr = String(row[toIdx] || '').trim()
+      const fromStr = String(row[fromIdx] || '').trim()
+      const notesStr = notesIdx >= 0 ? String(row[notesIdx] ?? '').trim() : ''
+      const resourcesStr = resourcesIdx >= 0 ? String(row[resourcesIdx] ?? '').trim() : ''
+      
+      // Validate title
+      if (!title) {
+        errors.push(`Row ${rowNum}: Title is required`)
+        return
+      }
+      
+      // Validate and parse due time
+      const dueSeconds = parseFlexibleHMS(dueTimeStr)
+      if (dueSeconds === null) {
+        errors.push(`Row ${rowNum}: Invalid time format "${dueTimeStr}". Use HH:MM:SS format.`)
+        return
+      }
+      
+      // Parse type
+      const type = mapInjectType(typeStr)
+      
+      const parsedNumber = parseInt(numberStr, 10)
+      validInjects.push({
+        id: generateId(),
+        number: isNaN(parsedNumber) ? existingInjects.length + validInjects.length + 1 : parsedNumber,
+        title,
+        dueSeconds,
+        type,
+        status: 'pending',
+        to: toStr,
+        from: fromStr,
+        notes: notesStr,
+        resources: resourcesStr,
+      })
+    })
+
+    // Run enhanced MSE validation on the processed data
+    if (validInjects.length > 0) {
+      const mseValidation = validateMSEData(validInjects)
+
+      // Add validation warnings and errors
+      errors.push(...mseValidation.errors)
+
+      // Add warnings as informational messages (but don't block import)
+      if (mseValidation.warnings.length > 0) {
+        errors.push('--- MSE Quality Warnings ---')
+        errors.push(...mseValidation.warnings.map(w => `WARNING: ${w}`))
+      }
+    }
+
+    return { validInjects, errors }
+    
+  } catch {
+    return {
+      validInjects: [],
+      errors: ['Error reading file. Please ensure it is a valid CSV or Excel file.']
+    }
+  }
+}
+
+export interface ResourceImportResult {
+  validResources: ResourceItem[]
+  errors: string[]
+}
+
+export const processResourcesFile = async (file: File, currentSeconds: number): Promise<ResourceImportResult> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer)
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+    
+    if (jsonData.length < 2) {
+      return {
+        validResources: [],
+        errors: ['File must contain at least one header row and one data row']
+      }
+    }
+    
+    const headers = jsonData[0] as string[]
+    const dataRows = jsonData.slice(1)
+    
+    // Normalize headers for matching
+    const normalizedHeaders = headers.map(h => normalizeHeader(String(h)))
+    
+    // Find column indices
+    const labelIdx = normalizedHeaders.findIndex(h => 
+      h.includes('label') || h.includes('name') || h.includes('resource')
+    )
+    const etaIdx = normalizedHeaders.findIndex(h => 
+      h.includes('eta') || h.includes('minutes') || h.includes('time')
+    )
+    const statusIdx = normalizedHeaders.findIndex(h => 
+      h.includes('status')
+    )
+    
+    if (labelIdx === -1 || etaIdx === -1) {
+      return {
+        validResources: [],
+        errors: ['Required columns not found. Please ensure you have Label and ETA columns.']
+      }
+    }
+    
+    // Process rows and validate
+    const errors: string[] = []
+    const validResources = [] as ResourceItem[]
+    
+    (dataRows as unknown[][]).forEach((row: unknown[], rowIndex) => {
+      const rowNum = rowIndex + 2 // +2 because we start from row 1 and skip header
+      
+      const label = String(row[labelIdx] || '').trim()
+      const etaStr = String(row[etaIdx] || '').trim()
+      const statusStr = String(row[statusIdx] || 'requested').trim().toLowerCase()
+      
+      // Validate label
+      if (!label) {
+        errors.push(`Row ${rowNum}: Label is required`)
+        return
+      }
+      
+      // Validate and parse ETA
+      const etaMinutes = parseInt(etaStr, 10)
+      if (isNaN(etaMinutes) || etaMinutes < 0) {
+        errors.push(`Row ${rowNum}: Invalid ETA "${etaStr}". Must be a positive number of minutes.`)
+        return
+      }
+      
+      // Parse status
+      let status: ResourceItem['status'] = 'requested'
+      if (['requested', 'tasked', 'enroute', 'arrived', 'cancelled'].includes(statusStr)) {
+        status = statusStr as ResourceItem['status']
+      }
+      
+      validResources.push({
+        id: generateId(),
+        label,
+        etaSeconds: currentSeconds + (etaMinutes * 60),
+        status
+      })
+    })
+    
+    return { validResources, errors }
+    
+  } catch {
+    return {
+      validResources: [],
+      errors: ['Error reading file. Please ensure it is a valid CSV or Excel file.']
+    }
+  }
+}
+
+
+
+
+
