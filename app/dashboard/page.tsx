@@ -569,7 +569,7 @@ export default function Dashboard() {
         const details = typeof a.details === 'object' ? JSON.stringify(a.details) : String(a.details)
         const line = `${t}  ${a.kind}  ${details}`
         const wrapped = doc.splitTextToSize(line, doc.internal.pageSize.getWidth() - marginX * 2)
-        wrapped.forEach(w => { doc.text(w, marginX, y); y += 12 })
+        wrapped.forEach((w: string) => { doc.text(w, marginX, y); y += 12 })
       })
     }
 
