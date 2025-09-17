@@ -3,6 +3,11 @@ import type { InjectItem, ResourceItem } from '../components/shared/types'
 import { parseHMS } from './timeUtils'
 import { generateId, normalizeHeader, mapInjectType, validateMSEData } from './validation'
 
+type MammothHtmlResult = { value: string }
+type MammothModule = {
+  convertToHtml: (input: { arrayBuffer: ArrayBuffer }) => Promise<MammothHtmlResult>
+}
+
 // Lazy-load Mammoth browser build at runtime to avoid bundler resolution issues
 const LOCAL_MAMMOTH = '/vendor/mammoth.browser.min.js'
 const CDN_MAMMOTH = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js'
@@ -16,16 +21,16 @@ const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
   document.head.appendChild(script)
 })
 
-const loadMammoth = async (): Promise<any> => {
+const loadMammoth = async (): Promise<MammothModule | null> => {
   if (typeof window === 'undefined') return null
-  const w = window as unknown as { mammoth?: any }
-  if (w.mammoth) return w.mammoth
+  const globalWithMammoth = window as typeof window & { mammoth?: MammothModule }
+  if (globalWithMammoth.mammoth) return globalWithMammoth.mammoth
   try {
     await loadScript(LOCAL_MAMMOTH)
   } catch {
     await loadScript(CDN_MAMMOTH)
   }
-  return (window as any).mammoth
+  return globalWithMammoth.mammoth ?? null
 }
 
 // Fuzzy matching for column headers - handles variations in real MSE documents
