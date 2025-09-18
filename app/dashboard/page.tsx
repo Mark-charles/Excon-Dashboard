@@ -1,6 +1,7 @@
 'use client'
 
 import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { InjectItem, ResourceItem, FilterState } from '../components/shared/types'
 import { parseHMS, formatHMS } from '../utils/timeUtils'
@@ -1141,6 +1142,13 @@ function DashboardContent() {
             </h4>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/dashboard/guide"
+              aria-label="Open dashboard guide"
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-gray-900 icon-btn"
+            >
+              Help / Guide
+            </Link>
             <button 
               onClick={handleExportExercise} 
               aria-label="Export exercise JSON"
@@ -1196,4 +1204,3 @@ export default function Dashboard() {
     </Suspense>
   )
 }
-
