@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { InjectItem, ResourceItem, FilterState } from '../components/shared/types'
 import { parseHMS, formatHMS } from '../utils/timeUtils'
@@ -60,7 +60,7 @@ const SESSION_STORAGE_KEY = 'excon_session'
 const BROADCAST_CHANNEL_NAME = 'excon-dashboard-sync'
 const TIMER_LEADER_KEY = 'excon_timer_leader'
 
-export default function Dashboard() {
+function DashboardContent() {
   // Exercise info
   const [exerciseName, setExerciseName] = useState("Untitled Exercise")
   const [controllerName, setControllerName] = useState("")
@@ -106,6 +106,7 @@ export default function Dashboard() {
   const missedAlertedRef = useRef<Set<string>>(new Set())
   const audioContextRef = useRef<AudioContext | null>(null)
   const timerLeaderRef = useRef(false)
+  const hasHydratedRef = useRef(false)
   
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false)
@@ -120,6 +121,8 @@ export default function Dashboard() {
     if (options?.suppressBroadcast) {
       suppressBroadcastRef.current = true
     }
+
+    hasHydratedRef.current = true
 
     setExerciseName(snapshot.exerciseName ?? 'Untitled Exercise')
     setControllerName(snapshot.controllerName ?? '')
@@ -156,6 +159,12 @@ export default function Dashboard() {
   const isTimerPopout = viewParam === 'timer'
   const isResourcePopout = viewParam === 'resources'
   const isPopout = isTimerPopout || isResourcePopout
+
+  useEffect(() => {
+    if (!isPopout) {
+      hasHydratedRef.current = true
+    }
+  }, [isPopout])
 
   // Exercise header handlers
   const handleExerciseNameChange = useCallback((value: string) => {
@@ -306,6 +315,7 @@ export default function Dashboard() {
   // Persistence & broadcast: save session to localStorage and notify other windows
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (!hasHydratedRef.current) return
 
     const snapshot: DashboardSnapshot = {
       exerciseName,
@@ -1179,4 +1189,11 @@ export default function Dashboard() {
   )
 }
 
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24 text-gray-300">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
+  )
+}
 
