@@ -9,6 +9,9 @@ interface TimerControlsProps {
   onStartStop: () => void
   onReset: () => void
   onManualTimeSet: (timeInput: string) => boolean
+  soundEnabled: boolean
+  onToggleSound: () => void
+  onPopout?: () => void
 }
 
 const TimerControls: React.FC<TimerControlsProps> = ({
@@ -16,7 +19,10 @@ const TimerControls: React.FC<TimerControlsProps> = ({
   isRunning,
   onStartStop,
   onReset,
-  onManualTimeSet
+  onManualTimeSet,
+  soundEnabled,
+  onToggleSound,
+  onPopout
 }) => {
   const [manualTime, setManualTime] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -36,11 +42,52 @@ const TimerControls: React.FC<TimerControlsProps> = ({
 
   return (
     <div className="bg-gray-800 rounded-lg p-6">
-      <div className="text-center mb-6">
-        <div className="text-6xl lg:text-8xl font-mono font-bold text-white mb-4 tracking-wider">
-          {formatHMS(currentSeconds)}
+      <div className="flex items-start justify-between mb-4">
+        <div className="text-left">
+          <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Exercise Timer</div>
+          <div className="text-6xl lg:text-7xl font-mono font-bold text-white tracking-wider">
+            {formatHMS(currentSeconds)}
+          </div>
         </div>
-        
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleSound}
+            aria-label={soundEnabled ? 'Mute inject alerts' : 'Unmute inject alerts'}
+            aria-pressed={soundEnabled}
+            className={`p-2 rounded-lg border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 focus-visible:ring-offset-gray-900 ${soundEnabled ? 'text-emerald-300 border-emerald-400/60 bg-emerald-500/10 hover:bg-emerald-500/20' : 'text-gray-300 border-gray-600/60 bg-gray-700/40 hover:bg-gray-700/60'}`}
+          >
+            {soundEnabled ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M5 15h3l4 4V5L8 9H5z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M16 9a3 3 0 010 6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M18.5 7a6 6 0 010 10" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M5 15h3l4 4V5L8 9H5z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M16 9l4 4m0-4l-4 4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+              </svg>
+            )}
+          </button>
+          {onPopout && (
+            <button
+              type="button"
+              onClick={onPopout}
+              aria-label="Open timer in a new window"
+              className="p-2 rounded-lg border border-gray-600/60 text-gray-200 bg-gray-700/40 hover:text-white hover:border-blue-400/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 focus-visible:ring-offset-gray-900"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M7 7h10v10" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M17 7l-8 8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <path d="M7 17h10" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="text-center mb-6">
         <div className="flex gap-4 justify-center mb-6">
           <button
             onClick={onStartStop}
