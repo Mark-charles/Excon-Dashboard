@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { InjectItem, ResourceItem, FilterState } from '../components/shared/types'
 import { parseHMS, formatHMS } from '../utils/timeUtils'
 import { generateId, canTransitionTo } from '../utils/validation'
@@ -36,6 +37,29 @@ type ActivityDetails = Record<string, unknown>
 
 interface ActivityEntry { ts: number; kind: ActivityKind; details: ActivityDetails }
 
+interface DashboardSnapshot {
+  exerciseName: string
+  controllerName: string
+  exerciseFinishTime: string
+  currentSeconds: number
+  isRunning: boolean
+  injects: InjectItem[]
+  resources: ResourceItem[]
+  activity: ActivityEntry[]
+  soundEnabled: boolean
+}
+
+type DashboardMessage = {
+  type: 'snapshot'
+  sourceId: string
+  payload: DashboardSnapshot
+  timestamp: number
+}
+
+const SESSION_STORAGE_KEY = 'excon_session'
+const BROADCAST_CHANNEL_NAME = 'excon-dashboard-sync'
+const TIMER_LEADER_KEY = 'excon_timer_leader'
+
 export default function Dashboard() {
   // Exercise info
   const [exerciseName, setExerciseName] = useState("Untitled Exercise")
@@ -47,6 +71,8 @@ export default function Dashboard() {
   const [isRunning, setIsRunning] = useState(false)
   const [injects, setInjects] = useState<InjectItem[]>(initialInjects)
   const [resources, setResources] = useState<ResourceItem[]>([])
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [isTimerLeader, setIsTimerLeader] = useState(false)
   // Activity log for audit/reporting
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   // Persistence / restore state
@@ -58,8 +84,28 @@ export default function Dashboard() {
     injects: InjectItem[]
     resources: ResourceItem[]
     activity?: ActivityEntry[]
+    isRunning?: boolean
+    soundEnabled?: boolean
   }>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const windowIdRef = useRef<string>('')
+  if (!windowIdRef.current) {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        windowIdRef.current = crypto.randomUUID()
+      } else {
+        windowIdRef.current = `win-${Math.random().toString(36).slice(2)}`
+      }
+    } catch {
+      windowIdRef.current = `win-${Math.random().toString(36).slice(2)}`
+    }
+  }
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
+  const suppressBroadcastRef = useRef(false)
+  const dueAlertedRef = useRef<Set<string>>(new Set())
+  const missedAlertedRef = useRef<Set<string>>(new Set())
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const timerLeaderRef = useRef(false)
   
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false)
@@ -68,6 +114,25 @@ export default function Dashboard() {
   const logActivity = useCallback((kind: ActivityKind, details: ActivityDetails = {}) => {
     const entry: ActivityEntry = { ts: Date.now(), kind, details }
     setActivity(prev => [...prev, entry])
+  }, [])
+
+  const applySnapshot = useCallback((snapshot: Partial<DashboardSnapshot>, options?: { suppressBroadcast?: boolean }) => {
+    if (options?.suppressBroadcast) {
+      suppressBroadcastRef.current = true
+    }
+
+    setExerciseName(snapshot.exerciseName ?? 'Untitled Exercise')
+    setControllerName(snapshot.controllerName ?? '')
+    setExerciseFinishTime(snapshot.exerciseFinishTime ?? '')
+    setCurrentSeconds(typeof snapshot.currentSeconds === 'number' ? snapshot.currentSeconds : 0)
+    setIsRunning(Boolean(snapshot.isRunning))
+    setInjects(Array.isArray(snapshot.injects) ? snapshot.injects : [])
+    setResources(Array.isArray(snapshot.resources) ? snapshot.resources : [])
+    setActivity(Array.isArray(snapshot.activity) ? snapshot.activity : [])
+    setSoundEnabled(typeof snapshot.soundEnabled === 'boolean' ? snapshot.soundEnabled : true)
+    dueAlertedRef.current.clear()
+    missedAlertedRef.current.clear()
+    setPendingRestore(null)
   }, [])
 
   // Filter state
@@ -86,6 +151,12 @@ export default function Dashboard() {
     showCancelledStatus: true
   })
 
+  const searchParams = useSearchParams()
+  const viewParam = searchParams?.get('view') ?? ''
+  const isTimerPopout = viewParam === 'timer'
+  const isResourcePopout = viewParam === 'resources'
+  const isPopout = isTimerPopout || isResourcePopout
+
   // Exercise header handlers
   const handleExerciseNameChange = useCallback((value: string) => {
     setExerciseName(value)
@@ -99,8 +170,65 @@ export default function Dashboard() {
     setExerciseFinishTime(value)
   }, [])
 
-  // Timer effects
+  const playBeeps = useCallback(async (count: number) => {
+    if (!soundEnabled || typeof window === 'undefined') return
+
+    const audioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!audioCtor) return
+
+    let ctx = audioContextRef.current
+    if (!ctx) {
+      try {
+        ctx = new audioCtor()
+        audioContextRef.current = ctx
+      } catch {
+        audioContextRef.current = null
+        return
+      }
+    }
+
+    try {
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
+    } catch {
+      // ignore resume errors
+    }
+
+    const now = ctx.currentTime + 0.05
+    for (let i = 0; i < count; i += 1) {
+      const startTime = now + i * 0.35
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(880, startTime)
+      gain.gain.setValueAtTime(0.0001, startTime)
+      gain.gain.linearRampToValueAtTime(0.15, startTime + 0.02)
+      gain.gain.linearRampToValueAtTime(0.0001, startTime + 0.25)
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start(startTime)
+      oscillator.stop(startTime + 0.3)
+    }
+  }, [soundEnabled])
+
   useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close()
+        } catch {
+          // ignore close errors
+        }
+        audioContextRef.current = null
+      }
+    }
+  }, [])
+
+  // Timer effects - only the leader window advances time
+  useEffect(() => {
+    if (!isTimerLeader) return
+
     let intervalId: ReturnType<typeof setInterval> | null = null
 
     if (isRunning) {
@@ -114,12 +242,12 @@ export default function Dashboard() {
         clearInterval(intervalId)
       }
     }
-  }, [isRunning])
+  }, [isRunning, isTimerLeader])
 
   // Auto-check for missed injects
   useEffect(() => {
-    setInjects(prevInjects => 
-      prevInjects.map(inject => 
+    setInjects(prevInjects =>
+      prevInjects.map(inject =>
         inject.status === "pending" && currentSeconds > inject.dueSeconds
           ? { ...inject, status: "missed" as const }
           : inject
@@ -127,36 +255,230 @@ export default function Dashboard() {
     )
   }, [currentSeconds])
 
-  // Persistence: save session to localStorage
+  // Alerting for due and missed injects
   useEffect(() => {
-    try {
-      const snapshot = {
-        exerciseName,
-        controllerName,
-        exerciseFinishTime,
-        currentSeconds,
-        injects,
-        resources,
-        activity,
+    if (injects.length === 0) {
+      dueAlertedRef.current.clear()
+      missedAlertedRef.current.clear()
+      return
+    }
+
+    const validIds = new Set<string>()
+
+    injects.forEach((inject) => {
+      validIds.add(inject.id)
+
+      if (inject.status === 'pending') {
+        if (currentSeconds === inject.dueSeconds) {
+          if (!dueAlertedRef.current.has(inject.id)) {
+            dueAlertedRef.current.add(inject.id)
+            void playBeeps(1)
+          }
+        } else if (currentSeconds < inject.dueSeconds) {
+          dueAlertedRef.current.delete(inject.id)
+        }
+      } else {
+        dueAlertedRef.current.delete(inject.id)
       }
-      localStorage.setItem('excon_session', JSON.stringify(snapshot))
+
+      if (inject.status === 'missed') {
+        if (!missedAlertedRef.current.has(inject.id)) {
+          missedAlertedRef.current.add(inject.id)
+          void playBeeps(2)
+        }
+      } else {
+        missedAlertedRef.current.delete(inject.id)
+      }
+    })
+
+    for (const id of Array.from(dueAlertedRef.current)) {
+      if (!validIds.has(id)) {
+        dueAlertedRef.current.delete(id)
+      }
+    }
+    for (const id of Array.from(missedAlertedRef.current)) {
+      if (!validIds.has(id)) {
+        missedAlertedRef.current.delete(id)
+      }
+    }
+  }, [currentSeconds, injects, playBeeps])
+
+  // Persistence & broadcast: save session to localStorage and notify other windows
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const snapshot: DashboardSnapshot = {
+      exerciseName,
+      controllerName,
+      exerciseFinishTime,
+      currentSeconds,
+      isRunning,
+      injects,
+      resources,
+      activity,
+      soundEnabled
+    }
+
+    if (suppressBroadcastRef.current) {
+      suppressBroadcastRef.current = false
+      return
+    }
+
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot))
     } catch {
       // ignore storage errors
     }
-  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, injects, resources, activity])
+
+    try {
+      broadcastChannelRef.current?.postMessage({
+        type: 'snapshot',
+        sourceId: windowIdRef.current,
+        payload: snapshot,
+        timestamp: Date.now()
+      } satisfies DashboardMessage)
+    } catch {
+      // ignore broadcast errors
+    }
+  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, isRunning, injects, resources, activity, soundEnabled])
 
   // Check for existing session on mount
   useEffect(() => {
+    if (typeof window === 'undefined') return
+
     try {
-      const raw = localStorage.getItem('excon_session')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed && typeof parsed === 'object') {
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY)
+      if (!raw) return
+
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        if (isPopout) {
+          applySnapshot(parsed, { suppressBroadcast: true })
+        } else {
           setPendingRestore(parsed)
         }
       }
     } catch {
       // ignore parse errors
+    }
+  }, [applySnapshot, isPopout])
+
+  // Listen for cross-window updates
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let channel: BroadcastChannel | null = null
+
+    if ('BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME)
+        broadcastChannelRef.current = channel
+        channel.onmessage = (event: MessageEvent<DashboardMessage>) => {
+          const message = event.data
+          if (!message || message.type !== 'snapshot') return
+          if (message.sourceId === windowIdRef.current) return
+          applySnapshot(message.payload, { suppressBroadcast: true })
+        }
+      } catch {
+        channel = null
+      }
+    }
+
+    const handleStorageSync = (event: StorageEvent) => {
+      if (event.key !== SESSION_STORAGE_KEY || !event.newValue) return
+      try {
+        const parsed = JSON.parse(event.newValue)
+        if (parsed && typeof parsed === 'object') {
+          applySnapshot(parsed, { suppressBroadcast: true })
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+
+    window.addEventListener('storage', handleStorageSync)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageSync)
+      if (channel) {
+        channel.close()
+      }
+      if (broadcastChannelRef.current === channel) {
+        broadcastChannelRef.current = null
+      }
+    }
+  }, [applySnapshot])
+
+  // Determine which window owns the timer interval
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const id = windowIdRef.current
+
+    const claimLeadership = (): boolean => {
+      try {
+        const existing = localStorage.getItem(TIMER_LEADER_KEY)
+        if (!existing) {
+          localStorage.setItem(TIMER_LEADER_KEY, id)
+          timerLeaderRef.current = true
+          setIsTimerLeader(true)
+          return true
+        }
+        if (existing === id) {
+          timerLeaderRef.current = true
+          setIsTimerLeader(true)
+          return true
+        }
+        timerLeaderRef.current = false
+        setIsTimerLeader(false)
+        return false
+      } catch {
+        return false
+      }
+    }
+
+    const releaseLeadership = () => {
+      if (timerLeaderRef.current) {
+        try {
+          localStorage.removeItem(TIMER_LEADER_KEY)
+        } catch {
+          // ignore errors
+        }
+      }
+    }
+
+    claimLeadership()
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== TIMER_LEADER_KEY) return
+      if (!event.newValue) {
+        claimLeadership()
+        return
+      }
+      if (event.newValue === id) {
+        timerLeaderRef.current = true
+        setIsTimerLeader(true)
+      } else {
+        timerLeaderRef.current = false
+        setIsTimerLeader(false)
+      }
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        claimLeadership()
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('beforeunload', releaseLeadership)
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('beforeunload', releaseLeadership)
+      releaseLeadership()
     }
   }, [])
 
@@ -196,6 +518,22 @@ export default function Dashboard() {
     }
     logWarn('TimerControls', `Invalid manual time input: ${timeInput}`)
     return false
+  }, [])
+
+  const handleToggleSound = useCallback(() => {
+    setSoundEnabled(prev => !prev)
+  }, [])
+
+  const handlePopoutTimer = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const timerWindow = window.open('/dashboard?view=timer', 'excon-timer-popout', 'width=520,height=620,noopener=yes')
+    timerWindow?.focus()
+  }, [])
+
+  const handlePopoutResources = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const resourceWindow = window.open('/dashboard?view=resources', 'excon-resources-popout', 'width=720,height=720,noopener=yes')
+    resourceWindow?.focus()
   }, [])
 
   // Inject handlers
@@ -394,9 +732,11 @@ export default function Dashboard() {
       controllerName,
       exerciseFinishTime,
       currentSeconds,
+      isRunning,
       injects,
       resources,
       activity,
+      soundEnabled,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -406,7 +746,7 @@ export default function Dashboard() {
     a.click()
     URL.revokeObjectURL(url)
     try { logActivity('session:export', { injects: injects.length, resources: resources.length }) } catch {}
-  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, injects, resources, activity, logActivity])
+  }, [exerciseName, controllerName, exerciseFinishTime, currentSeconds, isRunning, injects, resources, activity, soundEnabled, logActivity])
 
   const handleImportSessionClick = useCallback(() => {
     fileInputRef.current?.click()
@@ -424,9 +764,13 @@ export default function Dashboard() {
           setControllerName(data.controllerName || '')
           setExerciseFinishTime(data.exerciseFinishTime || '')
           setCurrentSeconds(typeof data.currentSeconds === 'number' ? data.currentSeconds : 0)
+          setIsRunning(Boolean(data.isRunning))
           setInjects(Array.isArray(data.injects) ? data.injects : [])
           setResources(Array.isArray(data.resources) ? data.resources : [])
           setActivity(Array.isArray(data.activity) ? data.activity : [])
+          setSoundEnabled(typeof data.soundEnabled === 'boolean' ? data.soundEnabled : true)
+          dueAlertedRef.current.clear()
+          missedAlertedRef.current.clear()
           try { logActivity('session:import', { injects: Array.isArray(data.injects) ? data.injects.length : 0, resources: Array.isArray(data.resources) ? data.resources.length : 0 }) } catch {}
         }
       } catch (err) {
@@ -452,15 +796,20 @@ export default function Dashboard() {
 
   const handleResetDashboard = useCallback(() => {
     if (typeof window !== 'undefined' && window.confirm('Reset dashboard and wipe all data? This cannot be undone.')) {
-      try { localStorage.removeItem('excon_session') } catch {}
+      try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch {}
+      try { localStorage.removeItem(TIMER_LEADER_KEY) } catch {}
       setExerciseName('Untitled Exercise')
       setControllerName('')
       setExerciseFinishTime('')
       setCurrentSeconds(0)
+      setIsRunning(false)
       setInjects([])
       setResources([])
       setPendingRestore(null)
       setActivity([])
+      setSoundEnabled(true)
+      dueAlertedRef.current.clear()
+      missedAlertedRef.current.clear()
       try { logActivity('session:reset', {}) } catch {}
     }
   }, [logActivity])
@@ -579,25 +928,64 @@ export default function Dashboard() {
 
   const handleRestoreSession = useCallback(() => {
     if (!pendingRestore) return
-    setExerciseName(pendingRestore.exerciseName || 'Untitled Exercise')
-    setControllerName(pendingRestore.controllerName || '')
-    setExerciseFinishTime(pendingRestore.exerciseFinishTime || '')
-    setCurrentSeconds(typeof pendingRestore.currentSeconds === 'number' ? pendingRestore.currentSeconds : 0)
-    setInjects(Array.isArray(pendingRestore.injects) ? pendingRestore.injects : [])
-    setResources(Array.isArray(pendingRestore.resources) ? pendingRestore.resources : [])
-    setActivity(Array.isArray(pendingRestore.activity) ? pendingRestore.activity : [])
-    setPendingRestore(null)
-  }, [pendingRestore])
+    applySnapshot(pendingRestore)
+  }, [applySnapshot, pendingRestore])
 
   const handleDismissRestore = useCallback(() => {
-    localStorage.removeItem('excon_session')
+    try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch {}
     setPendingRestore(null)
   }, [])
+
+  if (isTimerPopout) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 p-4 lg:p-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="text-center text-gray-300">
+            <div className="text-2xl font-semibold text-white">{exerciseName || 'Exercise Timer'}</div>
+            {controllerName ? (
+              <div className="text-sm text-gray-400">Controller: {controllerName}</div>
+            ) : null}
+          </div>
+          <TimerControls
+            currentSeconds={currentSeconds}
+            isRunning={isRunning}
+            onStartStop={handleStartStop}
+            onReset={handleReset}
+            onManualTimeSet={handleManualTimeSet}
+            soundEnabled={soundEnabled}
+            onToggleSound={handleToggleSound}
+          />
+          <div className="text-center text-xs text-gray-500">This window stays in sync with the main dashboard.</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isResourcePopout) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 p-4 lg:p-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          <div className="text-center text-gray-300">
+            <div className="text-2xl font-semibold text-white">{exerciseName || 'Resource Board'}</div>
+            {controllerName ? (
+              <div className="text-sm text-gray-400">Controller: {controllerName}</div>
+            ) : null}
+          </div>
+          <ResourceRequestBoard
+            resources={resources}
+            onResourceStatusChange={handleResourceStatusChange}
+            onResourceETAEdit={handleResourceETAEdit}
+          />
+          <div className="text-center text-xs text-gray-500">Updates apply instantly across all windows.</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 p-4 lg:p-6">
       <div className="max-w-8xl mx-auto space-y-6">
-        {pendingRestore && (
+        {!isPopout && pendingRestore && (
           <div className="p-4 bg-gradient-to-r from-blue-900/90 to-blue-800/90 border border-blue-500/50 rounded-2xl text-white flex items-center justify-between shadow-xl backdrop-blur-sm">
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
@@ -657,15 +1045,19 @@ export default function Dashboard() {
               onStartStop={handleStartStop}
               onReset={handleReset}
               onManualTimeSet={handleManualTimeSet}
+              soundEnabled={soundEnabled}
+              onToggleSound={handleToggleSound}
+              onPopout={handlePopoutTimer}
             />
           </div>
-          
+
           {/* Resource Request Board - Takes more space */}
           <div className="xl:col-span-2">
             <ResourceRequestBoard
               resources={resources}
               onResourceStatusChange={handleResourceStatusChange}
               onResourceETAEdit={handleResourceETAEdit}
+              onPopout={handlePopoutResources}
             />
           </div>
         </div>
